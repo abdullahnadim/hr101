@@ -16,7 +16,7 @@ export default function CSVImporter({ onImportSuccess }: { onImportSuccess: () =
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
-      complete: async (results) => {
+      complete: async (results: any) => {
         try {
           // Send parsed rows to your API
           // Note: In production, use a bulk insert API route instead of a loop

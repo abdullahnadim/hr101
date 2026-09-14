@@ -12,7 +12,7 @@ export const processImport = (file: File) => {
   Papa.parse(file, {
     header: true,
     skipEmptyLines: true,
-    complete: (results) => {
+    complete: (results: any) => {
       const valid = [];
       const invalid = [];
       
