@@ -7,7 +7,7 @@ import AddCandidateModal from '@/components/AddCandidateModal';
 import { Plus, Play } from 'lucide-react';
 
 export default function Dashboard() {
-  const [candidates, setCandidates] = useState([]);
+  const [candidates, setCandidates] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
   // Modal states
