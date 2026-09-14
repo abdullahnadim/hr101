@@ -21,7 +21,7 @@ export const processImport = (file: File) => {
         if (parseResult.success) {
           valid.push(parseResult.data);
         } else {
-          invalid.push({ row, errors: parseResult.error.errors });
+          invalid.push({ row, errors: parseResult.error.issues });
         }
       });
       
