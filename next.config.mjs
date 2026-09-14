@@ -1,21 +1,16 @@
-import withPWAInit from "next-pwa";
+import withPWAInit from 'next-pwa';
 
 const withPWA = withPWAInit({
-  dest: "public",
+  dest: 'public',
+  disable: process.env.NODE_ENV === 'development',
   register: true,
   skipWaiting: true,
-  disable: process.env.NODE_ENV === "development",
 });
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: true,
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '2mb',
-    },
-  },
-  turbopack: {},
+  // Keeps Next.js 16 happy during Vercel builds
+  turbopack: {}, 
 };
 
 export default withPWA(nextConfig);

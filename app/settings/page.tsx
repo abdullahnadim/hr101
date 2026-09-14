@@ -1,11 +1,12 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Save, Plus, X, Briefcase, FormInput, Check, Loader2, Mail, MessageSquare } from 'lucide-react';
+import { Save, Plus, X, Briefcase, FormInput, Check, Loader2, Mail, MessageSquare, Building2 } from 'lucide-react';
 import { useSettingsStore } from '@/store/useSettingsStore';
 
 export default function SettingsPage() {
   const [mounted, setMounted] = useState(false);
   const [newPosition, setNewPosition] = useState('');
+  const [newDepartment, setNewDepartment] = useState('');
   const [newFieldLabel, setNewFieldLabel] = useState('');
   
   // Button UX states
@@ -15,6 +16,7 @@ export default function SettingsPage() {
   // Zustand Store
   const { 
     positions, addPosition, removePosition, 
+    departments, addDepartment, removeDepartment,
     customFields, addField, removeField,
     emailTemplate, setEmailTemplate,
     smsTemplate, setSmsTemplate
@@ -37,6 +39,13 @@ export default function SettingsPage() {
     if (newPosition.trim()) {
       addPosition(newPosition.trim());
       setNewPosition('');
+    }
+  };
+
+  const handleAddDepartment = () => {
+    if (newDepartment.trim()) {
+      addDepartment(newDepartment.trim());
+      setNewDepartment('');
     }
   };
 
@@ -93,8 +102,8 @@ export default function SettingsPage() {
         </button>
       </header>
 
-      <div className="p-8 max-w-5xl mx-auto space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="p-8 max-w-7xl mx-auto space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           
           {/* Positions Configuration */}
           <section className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
@@ -102,7 +111,7 @@ export default function SettingsPage() {
               <Briefcase size={18} className="text-neutral-500" />
               <div>
                 <h2 className="font-semibold text-neutral-800">Job Positions</h2>
-                <p className="text-xs text-neutral-500 mt-0.5">Preset positions for candidate auto-suggest.</p>
+                <p className="text-xs text-neutral-500 mt-0.5">Preset auto-suggest roles.</p>
               </div>
             </div>
             <div className="p-6 flex-1">
@@ -120,10 +129,46 @@ export default function SettingsPage() {
                 </button>
               </div>
               <div className="flex flex-wrap gap-2">
-                {positions.map(pos => (
+                {positions?.map(pos => (
                   <span key={pos} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-neutral-50 border border-neutral-200 rounded-md text-sm text-neutral-700">
                     {pos}
                     <button onClick={() => removePosition(pos)} className="text-neutral-400 hover:text-red-500">
+                      <X size={14} />
+                    </button>
+                  </span>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          {/* Departments Configuration */}
+          <section className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50 flex items-center gap-2">
+              <Building2 size={18} className="text-neutral-500" />
+              <div>
+                <h2 className="font-semibold text-neutral-800">Departments</h2>
+                <p className="text-xs text-neutral-500 mt-0.5">Preset organizational units.</p>
+              </div>
+            </div>
+            <div className="p-6 flex-1">
+              <div className="flex gap-2 mb-4">
+                <input 
+                  type="text" 
+                  value={newDepartment}
+                  onChange={(e) => setNewDepartment(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddDepartment()}
+                  placeholder="Add new department..." 
+                  className="flex-1 px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
+                />
+                <button onClick={handleAddDepartment} className="px-3 py-2 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors">
+                  <Plus size={18} />
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {departments?.map(dept => (
+                  <span key={dept} className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-neutral-50 border border-neutral-200 rounded-md text-sm text-neutral-700">
+                    {dept}
+                    <button onClick={() => removeDepartment(dept)} className="text-neutral-400 hover:text-red-500">
                       <X size={14} />
                     </button>
                   </span>
@@ -138,7 +183,7 @@ export default function SettingsPage() {
               <FormInput size={18} className="text-neutral-500" />
               <div>
                 <h2 className="font-semibold text-neutral-800">Candidate Fields</h2>
-                <p className="text-xs text-neutral-500 mt-0.5">Add extra input fields to the Add Candidate form.</p>
+                <p className="text-xs text-neutral-500 mt-0.5">Extra Add Candidate inputs.</p>
               </div>
             </div>
             <div className="p-6 flex-1">
@@ -156,7 +201,7 @@ export default function SettingsPage() {
                 </button>
               </div>
               <div className="space-y-2">
-                {customFields.map(field => (
+                {customFields?.map(field => (
                   <div key={field.id} className="flex justify-between items-center px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm text-neutral-700">
                     <span>{field.label}</span>
                     <button onClick={() => removeField(field.id)} className="text-neutral-400 hover:text-red-500">
@@ -164,7 +209,7 @@ export default function SettingsPage() {
                     </button>
                   </div>
                 ))}
-                {customFields.length === 0 && <p className="text-xs text-neutral-400 italic">No extra fields added yet.</p>}
+                {customFields?.length === 0 && <p className="text-xs text-neutral-400 italic">No extra fields added yet.</p>}
               </div>
             </div>
           </section>

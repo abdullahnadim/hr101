@@ -223,7 +223,18 @@ export default function ScheduleModal({ isOpen, onClose, candidates, onSuccess }
               <h3 className="text-xs font-bold text-neutral-800 uppercase tracking-wider flex items-center gap-1.5"><LinkIcon size={14} /> Online Meeting</h3>
               <div>
                 <label className="block text-xs font-semibold text-neutral-600 mb-1.5">Google Meet / Zoom Link</label>
-                <input type="url" placeholder="https://meet.google.com/..." value={meetingLink} onChange={(e) => setMeetingLink(e.target.value)} className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black" />
+                <input 
+  type="text" 
+  placeholder="https://meet.google.com/..." 
+  value={meetingLink} 
+  onChange={(e) => {
+    const val = e.target.value;
+    // Automatically extract just the URL if a huge text block is pasted
+    const urlMatch = val.match(/(https?:\/\/[^\s]+)/);
+    setMeetingLink(urlMatch ? urlMatch[0] : val);
+  }} 
+  className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black" 
+/>
               </div>
             </div>
             

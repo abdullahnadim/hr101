@@ -8,7 +8,7 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: any) {
   const [mounted, setMounted] = useState(false);
   
   // Pull dynamic configuration from our Zustand store
-  const { positions, customFields, employmentTypes } = useSettingsStore();
+  const { positions, departments, customFields, employmentTypes } = useSettingsStore();
 
   useEffect(() => setMounted(true), []);
   
@@ -40,6 +40,7 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: any) {
       phone: data.phone,
       email: data.email,
       position: data.position,
+      department: data.department, // Send the department to the database
       notes: extractedDynamicFields.length > 0 ? JSON.stringify(extractedDynamicFields) : null
     };
 
@@ -89,7 +90,7 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: any) {
             </div>
             
             <div className="grid grid-cols-2 gap-4">
-              {/* Position with native Auto-suggest Datalist */}
+              {/* Position */}
               <div>
                 <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Position *</label>
                 <input 
@@ -101,26 +102,44 @@ export default function AddCandidateModal({ isOpen, onClose, onSuccess }: any) {
                   placeholder="Type or select" 
                 />
                 <datalist id="positions-list">
-                  {positions.map(pos => (
+                  {positions?.map(pos => (
                     <option key={pos} value={pos} />
                   ))}
                 </datalist>
               </div>
 
-              {/* Employment Type Dropdown */}
+              {/* Department */}
               <div>
-                <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Employment Type *</label>
-                <select 
+                <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Department *</label>
+                <input 
                   required 
-                  name="employmentType" 
-                  defaultValue="Regular Employee"
-                  className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm bg-white"
-                >
-                  {employmentTypes.map(type => (
-                    <option key={type} value={type}>{type}</option>
+                  name="department" 
+                  list="departments-list" 
+                  autoComplete="off"
+                  className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" 
+                  placeholder="Type or select" 
+                />
+                <datalist id="departments-list">
+                  {departments?.map(dept => (
+                    <option key={dept} value={dept} />
                   ))}
-                </select>
+                </datalist>
               </div>
+            </div>
+
+            {/* Employment Type */}
+            <div>
+              <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Employment Type *</label>
+              <select 
+                required 
+                name="employmentType" 
+                defaultValue="Regular Employee"
+                className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm bg-white"
+              >
+                {employmentTypes?.map(type => (
+                  <option key={type} value={type}>{type}</option>
+                ))}
+              </select>
             </div>
           </div>
 

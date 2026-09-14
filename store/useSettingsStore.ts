@@ -12,6 +12,11 @@ interface SettingsState {
   addPosition: (pos: string) => void;
   removePosition: (pos: string) => void;
   
+  // New: Departments
+  departments: string[];
+  addDepartment: (dept: string) => void;
+  removeDepartment: (dept: string) => void;
+  
   employmentTypes: string[];
   addEmploymentType: (type: string) => void;
   removeEmploymentType: (type: string) => void;
@@ -34,7 +39,12 @@ export const useSettingsStore = create<SettingsState>()(
       addPosition: (pos) => set((state) => ({ positions: [...new Set([...state.positions, pos])] })),
       removePosition: (pos) => set((state) => ({ positions: state.positions.filter(p => p !== pos) })),
       
-      // New: Employment Types
+      // New: Departments Implementation
+      departments: ['Engineering', 'Marketing', 'Human Resources', 'Sales', 'Design'],
+      addDepartment: (dept) => set((state) => ({ departments: [...new Set([...state.departments, dept])] })),
+      removeDepartment: (dept) => set((state) => ({ departments: state.departments.filter(d => d !== dept) })),
+      
+      // Existing: Employment Types
       employmentTypes: ['Regular Employee', 'Intern', 'Contractor'],
       addEmploymentType: (type) => set((state) => ({ employmentTypes: [...new Set([...state.employmentTypes, type])] })),
       removeEmploymentType: (type) => set((state) => ({ employmentTypes: state.employmentTypes.filter(t => t !== type) })),
