@@ -3,7 +3,6 @@ import { Resend } from 'resend';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: Request) {
   try {
@@ -12,8 +11,10 @@ export async function POST(request: Request) {
     let emailSuccess = false;
     let smsSuccess = false;
 
-    // 1. Dispatch Email via Resend
+    // 1. Dispatch Email via Resend (Initialized safely inside the function)
     if (process.env.RESEND_API_KEY) {
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      
       const { error } = await resend.emails.send({
         from: 'HR Team <onboarding@resend.dev>', // Replace with your verified domain later
         to: email,
