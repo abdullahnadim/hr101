@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Organization {
+  id              String            @id @default(uuid())
+  name            String
+  timezone        String            @default("Asia/Dhaka")
+  users           User[]
+  candidates      Candidate[]
+  templates       MessageTemplate[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model User {
+  id              String       @id @default(uuid())
+  email           String       @unique
+  passwordHash    String
+  role            Role         @default(HR_STAFF)
+  orgId           String
+  organization    Organization @relation(fields: [orgId], references: [id])
+  auditLogs       AuditLog[]
+}
+
+enum Role {
+  ADMIN
+  HR_MANAGER
+  HR_STAFF
+}
+
+model Candidate {
+  id              String       @id @default(uuid())
+  orgId           String
+  organization    Organization @relation(fields: [orgId], references: [id])
+  name            String
+  phone           String
+  email           String
+  position        String
+  department      String?
+  status          String       @default("NEW") // NEW, SCHEDULED, COMPLETED, CANCELLED
+  messageStatus   String       @default("NOT_SENT") // NOT_SENT, EMAIL_SENT, SMS_SENT, BOTH
+  notes           String?
+  interview       Interview?
+  messageLogs     MessageLog[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+}
+
+model Interview {
+  id              String    @id @default(uuid())
+  candidateId     String    @unique
+  candidate       Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  date            DateTime  @db.Date
+  startTime       String    // Format: "10:30"
+  durationMinutes Int
+  location        String?
+  type            String    @default("IN_PERSON") // IN_PERSON, ONLINE, PHONE
+  interviewer     String?
+}
+
+model MessageTemplate {
+  id              String       @id @default(uuid())
+  orgId           String
+  organization    Organization @relation(fields: [orgId], references: [id])
+  name            String
+  channel         String       // EMAIL, SMS
+  subject         String?      
+  body            String
+  isActive        Boolean      @default(true)
+}
+
+model MessageLog {
+  id              String    @id @default(uuid())
+  candidateId     String
+  candidate       Candidate @relation(fields: [candidateId], references: [id])
+  channel         String    // EMAIL, SMS
+  content         String
+  status          String    // QUEUED, SENT, FAILED
+  provider        String    // e.g., "SMTP", "Twilio", "Manual Copy"
+  error           String?
+  sentAt          DateTime  @default(now())
+}
+
+model AuditLog {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  action          String
+  entity          String   // e.g., "Candidate", "Interview"
+  entityId        String
+  timestamp       DateTime @default(now())
+}
