@@ -52,3 +52,19 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     return NextResponse.json({ error: 'Failed to delete candidate' }, { status: 500 });
   }
 }
+
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    
+    const updatedCandidate = await prisma.candidate.update({
+      where: { id },
+      data: body,
+    });
+    
+    return NextResponse.json(updatedCandidate);
+  } catch (error) {
+    return NextResponse.json({ error: 'Failed to patch candidate' }, { status: 500 });
+  }
+}

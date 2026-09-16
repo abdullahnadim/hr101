@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { PlayCircle } from 'lucide-react';
 import { Copy, Mail, MessageSquare, Edit2, Trash2, Filter, Check, Send, Loader2 } from 'lucide-react';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import EditCandidateModal from './EditCandidateModal';
@@ -329,6 +330,14 @@ export default function CandidateTable({ candidates, refreshData }: { candidates
                     <button onClick={() => handleDelete(c.id)} title="Delete Candidate" className="p-1.5 rounded-md border border-neutral-200 bg-white hover:bg-red-50 hover:text-red-600 transition-all shadow-sm">
                       <Trash2 size={14} />
                     </button>
+                    {/* Start Interview Button */}
+<a 
+  href={`/interview/${c.id}`}
+  className="p-1.5 rounded-md border border-neutral-200 bg-white hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 transition-all shadow-sm"
+  title="Start Interview"
+>
+  <PlayCircle size={14} />
+</a>
                     
                   </div>
                 </td>

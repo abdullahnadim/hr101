@@ -44,9 +44,19 @@ model Candidate {
   email           String
   position        String
   department      String?
-  status          String       @default("NEW") // NEW, SCHEDULED, COMPLETED, CANCELLED
-  messageStatus   String       @default("NOT_SENT") // NOT_SENT, EMAIL_SENT, SMS_SENT, BOTH
+  status          String       @default("NEW") 
+  messageStatus   String       @default("NOT_SENT") 
   notes           String?
+  
+  // NEW: Interview Evaluation Fields
+  scoreTech       Int?
+  scoreComm       Int?
+  scoreCulture    Int?
+  generalScore    Int?
+  evalNotes       String?      // We will use this for "Remarks"
+  expectedSalary  String?      // NEW
+  noticePeriod    String?      // NEW
+
   interview       Interview?
   messageLogs     MessageLog[]
   createdAt       DateTime     @default(now())
