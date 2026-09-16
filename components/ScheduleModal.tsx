@@ -8,6 +8,7 @@ export default function ScheduleModal({ isOpen, onClose, candidates, onSuccess }
   // Settings
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('09:00');
+  const [endTime, setEndTime] = useState('18:00'); // New End Time Limit
   const [duration, setDuration] = useState('30');
   const [interval, setInterval] = useState('5');
   
@@ -58,60 +59,105 @@ export default function ScheduleModal({ isOpen, onClose, candidates, onSuccess }
     setScheduleData(prev => prev.map(c => c.id === id ? { ...c, assignedTime: time, selected: true } : c));
   };
 
-  // Upgraded Auto-Fill Algorithm (Native JS Math - No more timezone/date-fns bugs)
+  // Upgraded Auto-Fill with Day Boundary & Safe Break Handling
   const handleAutoFill = () => {
-    if (!startTime) return alert('Please enter a valid Start Time.');
+    if (!startTime || !endTime) return alert('Please enter valid Start and End times.');
 
-    // Parse base start time directly from the string (e.g. "09:00")
     const [startHr, startMin] = startTime.split(':').map(Number);
     let currentTime = new Date();
     currentTime.setHours(startHr, startMin, 0, 0);
 
-    // Parse break time if provided
-    let bStart: Date | null = null;
-    if (breakStart) {
-      const [bHr, bMin] = breakStart.split(':').map(Number);
-      bStart = new Date();
-      bStart.setHours(bHr, bMin, 0, 0);
+    const [endHr, endMin] = endTime.split(':').map(Number);
+    let dayEnd = new Date(currentTime);
+    dayEnd.setHours(endHr, endMin, 0, 0);
+
+    // If End Time is technically past midnight, push it to the next day to prevent instant cutoff
+    if (dayEnd <= currentTime) {
+      dayEnd.setDate(dayEnd.getDate() + 1);
     }
 
-    const bDuration = parseInt(breakDuration) || 0;
+    let bStart: Date | null = null;
+    let bEnd: Date | null = null;
+    if (breakStart && breakDuration) {
+      const [bHr, bMin] = breakStart.split(':').map(Number);
+      bStart = new Date(currentTime);
+      bStart.setHours(bHr, bMin, 0, 0);
+      const bDur = parseInt(breakDuration) || 0;
+      bEnd = new Date(bStart.getTime() + (bDur * 60000));
+    }
+
     const dur = parseInt(duration) || 30;
     const intv = parseInt(interval) || 0;
 
-    setScheduleData(prev => {
-      return prev.map(c => {
-        if (!c.selected) return c; 
+    let outOfTime = false;
+    let scheduledCount = 0;
+    let overflowCount = 0;
 
-        // Check break collisions
-        if (bStart) {
-          const proposedEnd = new Date(currentTime.getTime() + (dur * 60000));
-          const bEnd = new Date(bStart.getTime() + (bDuration * 60000));
+    const newScheduleData = scheduleData.map(c => {
+      if (!c.selected) return c; 
 
-          if (currentTime >= bStart && currentTime < bEnd) {
-            currentTime = bEnd; // Shift to end of break
-          } else if (currentTime < bStart && proposedEnd > bStart) {
-            currentTime = bEnd; // Overlaps, shift to end of break
-          }
+      if (outOfTime) {
+        overflowCount++;
+        return c; 
+      }
+
+      // 1. Check break collisions
+      if (bStart && bEnd) {
+        const proposedEnd = new Date(currentTime.getTime() + (dur * 60000));
+        
+        if (currentTime >= bStart && currentTime < bEnd) {
+          currentTime = new Date(bEnd); // We are inside the break, jump to the end of it
+        } else if (currentTime < bStart && proposedEnd > bStart) {
+          currentTime = new Date(bEnd); // The interview overlaps the start of the break, push it until after
         }
+      }
 
-        // Extract HH:MM in 24hr format for the HTML time input
-        const hours = currentTime.getHours().toString().padStart(2, '0');
-        const minutes = currentTime.getMinutes().toString().padStart(2, '0');
-        const timeString = `${hours}:${minutes}`;
+      // 2. Check if the interview pushes past the End of the Day
+      const finalProposedEnd = new Date(currentTime.getTime() + (dur * 60000));
+      if (finalProposedEnd > dayEnd) {
+        outOfTime = true;
+        overflowCount++;
+        return c; // Skip assigning time
+      }
 
-        // Add duration + buffer to setup the next loop
-        currentTime = new Date(currentTime.getTime() + ((dur + intv) * 60000));
+      // 3. Assign Time
+      const hours = currentTime.getHours().toString().padStart(2, '0');
+      const minutes = currentTime.getMinutes().toString().padStart(2, '0');
+      const timeString = `${hours}:${minutes}`;
 
-        return { ...c, assignedTime: timeString };
-      });
+      // Prepare currentTime for the next candidate in the loop
+      currentTime = new Date(currentTime.getTime() + ((dur + intv) * 60000));
+      scheduledCount++;
+
+      return { ...c, assignedTime: timeString };
     });
+
+    // 4. Alert user if the schedule hit the End Time limit
+    if (outOfTime) {
+      const confirmSpill = window.confirm(
+        `Today's schedule is full! We successfully fit ${scheduledCount} candidates before your end time (${endTime}).\n\n` +
+        `Do you want to automatically deselect the remaining ${overflowCount} candidates so you can save this batch and schedule them for a different day?`
+      );
+
+      if (confirmSpill) {
+        // Keep scheduled candidates selected, unselect the overflow ones
+        const finalData = newScheduleData.map(c => {
+          if (c.selected && !c.assignedTime) {
+             return { ...c, selected: false };
+          }
+          return c;
+        });
+        setScheduleData(finalData);
+        return;
+      }
+    }
+
+    setScheduleData(newScheduleData);
   };
 
   const handleSubmit = async () => {
     const toSchedule = scheduleData.filter(c => c.selected && c.assignedTime);
     
-    // Fallback alerts if user clicks save with bad data
     if (toSchedule.length === 0) return alert("Please assign a time to at least one selected candidate.");
     if (!date) return alert("Please select an interview date.");
 
@@ -177,11 +223,19 @@ export default function ScheduleModal({ isOpen, onClose, candidates, onSuccess }
                   <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full pl-9 pr-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black" />
                 </div>
               </div>
+              
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-neutral-600 mb-1.5">Start Time</label>
                   <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black" />
                 </div>
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-600 mb-1.5">End Time</label>
+                  <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-neutral-600 mb-1.5">Duration</label>
                   <div className="relative">
@@ -189,12 +243,12 @@ export default function ScheduleModal({ isOpen, onClose, candidates, onSuccess }
                     <span className="absolute right-3 top-2.5 text-xs text-neutral-400">m</span>
                   </div>
                 </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-neutral-600 mb-1.5">Buffer (Between Interviews)</label>
-                <div className="relative">
-                  <input type="number" value={interval} onChange={(e) => setInterval(e.target.value)} className="w-full pl-3 pr-8 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black" />
-                  <span className="absolute right-3 top-2.5 text-xs text-neutral-400">m</span>
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-600 mb-1.5">Buffer</label>
+                  <div className="relative">
+                    <input type="number" value={interval} onChange={(e) => setInterval(e.target.value)} className="w-full pl-3 pr-8 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black" />
+                    <span className="absolute right-3 top-2.5 text-xs text-neutral-400">m</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -224,17 +278,16 @@ export default function ScheduleModal({ isOpen, onClose, candidates, onSuccess }
               <div>
                 <label className="block text-xs font-semibold text-neutral-600 mb-1.5">Google Meet / Zoom Link</label>
                 <input 
-  type="text" 
-  placeholder="https://meet.google.com/..." 
-  value={meetingLink} 
-  onChange={(e) => {
-    const val = e.target.value;
-    // Automatically extract just the URL if a huge text block is pasted
-    const urlMatch = val.match(/(https?:\/\/[^\s]+)/);
-    setMeetingLink(urlMatch ? urlMatch[0] : val);
-  }} 
-  className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black" 
-/>
+                  type="text" 
+                  placeholder="https://meet.google.com/..." 
+                  value={meetingLink} 
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const urlMatch = val.match(/(https?:\/\/[^\s]+)/);
+                    setMeetingLink(urlMatch ? urlMatch[0] : val);
+                  }} 
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black" 
+                />
               </div>
             </div>
             

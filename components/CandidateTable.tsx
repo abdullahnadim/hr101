@@ -7,6 +7,9 @@ import EditCandidateModal from './EditCandidateModal';
 export default function CandidateTable({ candidates, refreshData }: { candidates: any[], refreshData: () => void }) {
   const [mounted, setMounted] = useState(false);
   
+  // Selection State
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  
   // Blast API State
   const [sendingId, setSendingId] = useState<string | null>(null);
   const [sentStatus, setSentStatus] = useState<Record<string, 'success' | 'failed'>>({});
@@ -25,6 +28,32 @@ export default function CandidateTable({ candidates, refreshData }: { candidates
   const { emailTemplate, smsTemplate } = useSettingsStore();
 
   useEffect(() => setMounted(true), []);
+
+  // --- SELECTION LOGIC ---
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>, filteredList: any[]) => {
+    if (e.target.checked) {
+      setSelectedIds(filteredList.map(c => c.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const handleSelectOne = (id: string) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(selectedId => selectedId !== id) : [...prev, id]
+    );
+  };
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedIds.length} selected candidates?`)) return;
+    
+    await Promise.all(
+      selectedIds.map(id => fetch(`/api/candidates/${id}`, { method: 'DELETE' }))
+    );
+    
+    setSelectedIds([]);
+    refreshData();
+  };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this candidate?')) return;
@@ -150,10 +179,41 @@ export default function CandidateTable({ candidates, refreshData }: { candidates
         </div>
       </div>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.length > 0 && (
+        <div className="bg-blue-50/80 border-b border-blue-100 px-6 py-3 flex justify-between items-center transition-all">
+          <span className="text-sm font-semibold text-blue-800 tracking-tight">
+            {selectedIds.length} candidate{selectedIds.length > 1 ? 's' : ''} selected
+          </span>
+          <div className="flex gap-2">
+            <button 
+              onClick={handleBulkDelete}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-white text-red-600 border border-red-200 hover:bg-red-50 rounded-md shadow-sm transition-colors"
+            >
+              <Trash2 size={14} /> Delete Selected
+            </button>
+            <button 
+              onClick={() => setSelectedIds([])}
+              className="px-3 py-1.5 text-xs font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-left text-sm text-neutral-700">
           <thead className="bg-neutral-50 text-xs font-semibold uppercase text-neutral-500 border-b border-neutral-200">
             <tr>
+              <th className="px-6 py-4 w-12">
+                <input 
+                  type="checkbox" 
+                  className="rounded border-neutral-300 text-black focus:ring-black cursor-pointer"
+                  checked={filteredCandidates.length > 0 && selectedIds.length === filteredCandidates.length}
+                  onChange={(e) => handleSelectAll(e, filteredCandidates)}
+                />
+              </th>
               <th className="px-6 py-4">Candidate</th>
               <th className="px-6 py-4">Contact</th>
               <th className="px-6 py-4">Role</th>
@@ -164,7 +224,15 @@ export default function CandidateTable({ candidates, refreshData }: { candidates
           </thead>
           <tbody className="divide-y divide-neutral-100">
             {filteredCandidates.map((c) => (
-              <tr key={c.id} className="hover:bg-neutral-50/50 transition-colors group">
+              <tr key={c.id} className={`hover:bg-neutral-50/50 transition-colors group ${selectedIds.includes(c.id) ? 'bg-blue-50/30' : ''}`}>
+                <td className="px-6 py-4">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-neutral-300 text-black focus:ring-black cursor-pointer"
+                    checked={selectedIds.includes(c.id)}
+                    onChange={() => handleSelectOne(c.id)}
+                  />
+                </td>
                 <td className="px-6 py-4">
                   <div className="font-medium text-neutral-900">{c.name}</div>
                   <div className="text-xs text-neutral-500 uppercase tracking-wider">ID: {c.id.split('-')[0]}</div>

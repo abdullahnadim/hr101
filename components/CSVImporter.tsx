@@ -18,17 +18,42 @@ export default function CSVImporter({ onImportSuccess }: { onImportSuccess: () =
       skipEmptyLines: true,
       complete: async (results: any) => {
         try {
-          // Send parsed rows to your API
-          // Note: In production, use a bulk insert API route instead of a loop
           for (const row of results.data as any[]) {
+            // 1. Clean Phone: Keep the entire string to allow multiple numbers
+            const rawPhone = String(row.phone || row.Phone || row.Contact || '').trim();
+            const cleanPhone = rawPhone || 'No Phone';
+
+            // 2. Clean Email: Use the specific placeholder if empty
+            const rawEmail = String(row.email || row.Email || '').trim();
+            const cleanEmail = rawEmail || 'Email not found';
+
+            // 3. Clean Position: Assign a fallback if empty
+            const cleanPosition = String(row.position || row.Position || row.Designation || '').trim() || 'Unspecified Role';
+
+            // 4. Clean Department
+            const cleanDepartment = String(row.department || row.Department || '').trim() || null;
+
+            // 5. Capture Extra Columns into JSON Notes
+            const extraFields = [];
+            const empType = row['Employee Type'] || row['employee type'];
+            if (empType) {
+              extraFields.push({ key: 'Employee Type', value: String(empType).trim() });
+            }
+            const sl = row['SL'] || row['sl'];
+            if (sl) {
+              extraFields.push({ key: 'SL', value: String(sl).trim() });
+            }
+
             await fetch('/api/candidates', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                name: row.name || row.Name || 'Unknown',
-                email: row.email || row.Email || '',
-                phone: row.phone || row.Phone || '',
-                position: row.position || row.Position || 'Unspecified',
+                name: String(row.name || row.Name || 'Unknown Candidate').trim(),
+                email: cleanEmail,
+                phone: cleanPhone,
+                position: cleanPosition,
+                department: cleanDepartment,
+                notes: extraFields.length > 0 ? JSON.stringify(extraFields) : null
               })
             });
           }
