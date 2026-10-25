@@ -14,6 +14,7 @@ model Organization {
   timezone        String            @default("Asia/Dhaka")
   users           User[]
   candidates      Candidate[]
+  employees       Employee[]        // NEW: Link to Employees
   templates       MessageTemplate[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
@@ -48,14 +49,13 @@ model Candidate {
   messageStatus   String       @default("NOT_SENT") 
   notes           String?
   
-  // NEW: Interview Evaluation Fields
   scoreTech       Int?
   scoreComm       Int?
   scoreCulture    Int?
   generalScore    Int?
-  evalNotes       String?      // We will use this for "Remarks"
-  expectedSalary  String?      // NEW
-  noticePeriod    String?      // NEW
+  evalNotes       String?      
+  expectedSalary  String?      
+  noticePeriod    String?      
 
   interview       Interview?
   messageLogs     MessageLog[]
@@ -63,15 +63,57 @@ model Candidate {
   updatedAt       DateTime     @updatedAt
 }
 
+// NEW: Independent Employee Model
+model Employee {
+  id              String         @id @default(uuid())
+  orgId           String
+  organization    Organization   @relation(fields: [orgId], references: [id])
+  
+  employeeCode    String         @unique 
+  name            String
+  email           String?        @unique
+  phone           String
+  position        String
+  department      String
+  joiningDate     DateTime       // Added field
+  status          String         @default("ACTIVE") 
+  
+  roomBookings    RoomBooking[]
+  
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+}
+
+// NEW: FAL Conference Room Booking Model
+model RoomBooking {
+  id              String    @id @default(uuid())
+  roomName        String    @default("FAL Conference Room")
+  
+  employeeId      String
+  employee        Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  teamName        String
+  reason          String
+  date            DateTime  @db.Date
+  startTime       String    // Format: "14:30"
+  durationMinutes Int
+  
+  // PENDING (Normal), APPROVED, REJECTED, CONFLICT (Overlap - Needs Admin)
+  status          String    @default("PENDING") 
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
 model Interview {
   id              String    @id @default(uuid())
   candidateId     String    @unique
   candidate       Candidate @relation(fields: [candidateId], references: [id], onDelete: Cascade)
   date            DateTime  @db.Date
-  startTime       String    // Format: "10:30"
+  startTime       String    
   durationMinutes Int
   location        String?
-  type            String    @default("IN_PERSON") // IN_PERSON, ONLINE, PHONE
+  type            String    @default("IN_PERSON") 
   interviewer     String?
 }
 
@@ -80,7 +122,7 @@ model MessageTemplate {
   orgId           String
   organization    Organization @relation(fields: [orgId], references: [id])
   name            String
-  channel         String       // EMAIL, SMS
+  channel         String       
   subject         String?      
   body            String
   isActive        Boolean      @default(true)
@@ -90,10 +132,10 @@ model MessageLog {
   id              String    @id @default(uuid())
   candidateId     String
   candidate       Candidate @relation(fields: [candidateId], references: [id])
-  channel         String    // EMAIL, SMS
+  channel         String    
   content         String
-  status          String    // QUEUED, SENT, FAILED
-  provider        String    // e.g., "SMTP", "Twilio", "Manual Copy"
+  status          String    
+  provider        String    
   error           String?
   sentAt          DateTime  @default(now())
 }
@@ -103,7 +145,7 @@ model AuditLog {
   userId          String
   user            User     @relation(fields: [userId], references: [id])
   action          String
-  entity          String   // e.g., "Candidate", "Interview"
+  entity          String   
   entityId        String
   timestamp       DateTime @default(now())
 }

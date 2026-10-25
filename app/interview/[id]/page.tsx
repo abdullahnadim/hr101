@@ -251,7 +251,6 @@ export default function InterviewScorecard({ params }: { params: Promise<{ id: s
                 className="w-full flex-1 min-h-[200px] p-4 bg-neutral-50 border border-neutral-200 rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-black focus:outline-none resize-y transition-colors"
               />
             </div>
-
           </div>
         </div>
       </div>
