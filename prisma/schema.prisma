@@ -14,26 +14,35 @@ model Organization {
   timezone        String            @default("Asia/Dhaka")
   users           User[]
   candidates      Candidate[]
-  employees       Employee[]        // NEW: Link to Employees
+  employees       Employee[]        
   templates       MessageTemplate[]
+  
+  // NEW: Payroll Settings Relation
+  payrollSettings PayrollSettings?
+  
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 }
 
 model User {
-  id              String       @id @default(uuid())
-  email           String       @unique
-  passwordHash    String
-  role            Role         @default(HR_STAFF)
-  orgId           String
-  organization    Organization @relation(fields: [orgId], references: [id])
-  auditLogs       AuditLog[]
+  id            String        @id @default(uuid())
+  email         String        @unique
+  passwordHash  String
+  role          Role          @default(HR_STAFF)
+  orgId         String
+  organization  Organization  @relation(fields: [orgId], references: [id])
+  auditLogs     AuditLog[]
+  
+  employeeId    String?       @unique
+  employee      Employee?     @relation(fields: [employeeId], references: [id])
 }
 
+// FIXED: Added IT_STAFF to support your Provisioning UI
 enum Role {
   ADMIN
   HR_MANAGER
   HR_STAFF
+  IT_STAFF
 }
 
 model Candidate {
@@ -48,7 +57,7 @@ model Candidate {
   status          String       @default("NEW") 
   messageStatus   String       @default("NOT_SENT") 
   notes           String?
-  customData  Json?
+  customData      Json?
   
   scoreTech       Int?
   scoreComm       Int?
@@ -64,26 +73,37 @@ model Candidate {
   updatedAt       DateTime     @updatedAt
 }
 
-// NEW: Independent Employee Model
 model Employee {
-  id              String         @id @default(uuid())
-  orgId           String
-  organization    Organization   @relation(fields: [orgId], references: [id])
+  id                   String        @id @default(uuid())
+  orgId                String
+  organization         Organization  @relation(fields: [orgId], references: [id])
   
-  employeeCode    String         @unique 
-  name            String
-  email           String?        @unique
-  phone           String
-  position        String
-  department      String
-  customData  Json?
-  joiningDate     DateTime       // Added field
-  status          String         @default("ACTIVE") 
+  employeeCode         String        @unique 
+  name                 String
+  email                String?       @unique
+  phone                String
+  position             String
+  department           String
+  customData           Json?
+  joiningDate          DateTime
+  status               String        @default("ACTIVE") 
   
-  roomBookings    RoomBooking[]
+  // --- NEW: PAYROLL & TRANSPORT FIELDS ---
+  baseSalary           Float         @default(0)
+  usesCompanyTransport Boolean       @default(false)
+  transportRouteFare   Float         @default(0)
+  mobileBillLimit      Float         @default(0)
   
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
+  leaveRequests        LeaveRequest[]
+  roomBookings         RoomBooking[]
+  itAssets             ITAsset[]
+  payrolls             Payroll[]
+  loans                Loan[]
+  
+  user                 User?
+  
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
 }
 
 model Room {
@@ -99,14 +119,11 @@ model Room {
   bookings    RoomBooking[]
 }
 
-// NEW: FAL Conference Room Booking Model
 model RoomBooking {
   id              String    @id @default(uuid())
   
-  // Link booking directly to the physical Room
   roomId          String?
   room            Room?     @relation(fields: [roomId], references: [id], onDelete: SetNull)
-  
   roomName        String    @default("FAL Conference Room")
   
   employeeId      String
@@ -115,16 +132,13 @@ model RoomBooking {
   teamName        String
   reason          String
   date            DateTime  @db.Date
-  startTime       String    // Format: "14:30"
+  startTime       String    
   durationMinutes Int
-  
   status          String    @default("PENDING") 
   
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 }
-
-
 
 model Interview {
   id              String    @id @default(uuid())
@@ -139,34 +153,154 @@ model Interview {
 }
 
 model MessageTemplate {
-  id              String       @id @default(uuid())
-  orgId           String
-  organization    Organization @relation(fields: [orgId], references: [id])
-  name            String
-  channel         String       
-  subject         String?      
-  body            String
-  isActive        Boolean      @default(true)
+  id            String       @id @default(uuid())
+  orgId         String
+  organization  Organization @relation(fields: [orgId], references: [id])
+  name          String
+  channel       String       
+  subject       String?      
+  body          String
+  isActive      Boolean      @default(true)
 }
 
 model MessageLog {
-  id              String    @id @default(uuid())
-  candidateId     String
-  candidate       Candidate @relation(fields: [candidateId], references: [id])
-  channel         String    
-  content         String
-  status          String    
-  provider        String    
-  error           String?
-  sentAt          DateTime  @default(now())
+  id          String    @id @default(uuid())
+  candidateId String
+  candidate   Candidate @relation(fields: [candidateId], references: [id])
+  channel     String    
+  content     String
+  status      String    
+  provider    String    
+  error       String?
+  sentAt      DateTime  @default(now())
 }
 
 model AuditLog {
-  id              String   @id @default(uuid())
-  userId          String
-  user            User     @relation(fields: [userId], references: [id])
-  action          String
-  entity          String   
-  entityId        String
-  timestamp       DateTime @default(now())
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  action      String
+  entity      String   
+  entityId    String
+  timestamp   DateTime @default(now())
+}
+
+// --- LEAVE MANAGEMENT ---
+
+model LeavePolicy {
+  id              String   @id @default(cuid())
+  orgId           String
+  name            String   
+  daysPerYear     Int
+  isPaid          Boolean  @default(true)
+  carryForward    Boolean  @default(false)
+  maxCarryForward Int?     @default(0)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model LeaveRequest {
+  id            String   @id @default(cuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  leaveType     String   
+  startDate     DateTime @db.Date
+  endDate       DateTime @db.Date
+  totalDays     Float    
+  reason        String
+  status        String   @default("PENDING") 
+  reviewerNotes String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// --- IT ASSET MANAGEMENT ---
+
+model ITAsset {
+  id            String    @id @default(cuid())
+  orgId         String
+  name          String    
+  category      String    
+  serialNumber  String?   
+  condition     String    @default("GOOD")      
+  status        String    @default("AVAILABLE") 
+  
+  assignedToId  String?
+  assignedTo    Employee? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  notes         String?
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+// --- GLOBAL PAYROLL SETTINGS ---
+
+model PayrollSettings {
+  id                     String       @id @default(cuid())
+  orgId                  String       @unique
+  organization           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  
+  transportAllowance     Float        @default(3500) 
+  basicPercentage        Float        @default(60)
+  houseRentPercentage    Float        @default(30)
+  medicalPercentage      Float        @default(10)
+  
+  updatedAt              DateTime     @updatedAt
+}
+
+// --- LOANS & ADVANCES ---
+
+model Loan {
+  id                     String       @id @default(cuid())
+  employeeId             String
+  employee               Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  type                   String       @default("COMPANY_LOAN") // COMPANY_LOAN, PRIME_AGRIM_ADVANCE
+  totalAmount            Float
+  emiAmount              Float        
+  remainingBalance       Float
+  
+  status                 String       @default("ACTIVE") // ACTIVE, COMPLETED, CANCELLED
+  
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+}
+
+// --- MONTHLY PAYSLIPS ---
+
+model Payroll {
+  id                     String   @id @default(cuid())
+  
+  employeeId             String
+  employee               Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  month                  Int      
+  year                   Int      
+  
+  grossSalary            Float    
+  basicSalary            Float    
+  houseRent              Float    
+  medicalAllowance       Float    
+  transportAllowance     Float    
+  otherAllowances        Float    @default(0)
+  
+  transportDeduction     Float    @default(0) 
+  taxDeduction           Float    @default(0) 
+  loanDeduction          Float    @default(0) 
+  advanceDeduction       Float    @default(0) 
+  leaveDeduction         Float    @default(0) 
+  otherDeductions        Float    @default(0)
+  
+  mobileBillAllocated    Float    @default(0) 
+  
+  netPay                 Float    
+  
+  status                 String   @default("DRAFT") // DRAFT, APPROVED, PAID
+  paymentDate            DateTime?
+  
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  
+  @@unique([employeeId, month, year]) 
 }

@@ -10,8 +10,22 @@ export async function GET(
   try {
     const resolvedParams = await params;
     
+    // Include related IT assets, bookings, and user account role
     const employee = await prisma.employee.findUnique({
-      where: { id: resolvedParams.id }
+      where: { id: resolvedParams.id },
+      include: {
+        itAssets: true,
+        roomBookings: {
+          orderBy: { date: 'desc' },
+          take: 5
+        },
+        leaveRequests: {
+          orderBy: { startDate: 'desc' }
+        },
+        user: {
+          select: { role: true, email: true }
+        }
+      }
     });
     
     if (!employee) {
@@ -33,7 +47,6 @@ export async function PATCH(
     const resolvedParams = await params;
     const body = await request.json();
     
-    // Safely parse the incoming stringified JSON so Prisma's Json type accepts it
     const rawDynamicData = body.customData || body.notes;
     const parsedCustomData = typeof rawDynamicData === 'string' ? JSON.parse(rawDynamicData) : rawDynamicData || null;
     
@@ -47,8 +60,6 @@ export async function PATCH(
         department: body.department,
         status: body.status,
         joiningDate: body.joiningDate || body.joinDate ? new Date(body.joiningDate || body.joinDate) : undefined,
-        
-        // FIXED: Explicitly target customData and pass the parsed JSON object
         customData: parsedCustomData,
       }
     });
