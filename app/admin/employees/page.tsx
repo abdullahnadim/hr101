@@ -183,7 +183,7 @@ export default function EmployeesPage() {
                     <td className="px-6 py-4">
                       <div className="font-bold text-neutral-900 flex items-center gap-2">
                         {emp.name}
-                        {emp.user && <CheckCircle2 size={14} className="text-emerald-500" title="Has System Login"/>}
+                        {emp.user && <CheckCircle2 size={14} className="text-emerald-500" />}
                       </div>
                       <div className="text-xs text-neutral-500 font-mono mt-0.5">{emp.employeeCode || 'ID Pending'}</div>
                     </td>
