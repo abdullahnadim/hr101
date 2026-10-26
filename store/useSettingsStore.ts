@@ -4,9 +4,9 @@ import { persist } from 'zustand/middleware';
 export interface CustomField {
   id: string;
   label: string;
-  type: string; // e.g., 'text', 'number', 'url', 'select', 'date'
+  type: string;
   required?: boolean;
-  options?: string[]; // only used if type === 'select'
+  options?: string[];
 }
 
 interface SettingsState {
@@ -33,7 +33,11 @@ interface SettingsState {
   addEmploymentType: (type: string) => void;
   removeEmploymentType: (type: string) => void;
   
-  // --- DYNAMIC CUSTOM FIELDS ---
+  // --- DYNAMIC CUSTOM FIELDS (Unified with alias support) ---
+  customFields: CustomField[]; // Alias for candidateFields for backwards compatibility
+  addField: (field: CustomField) => void;
+  removeField: (id: string) => void;
+
   candidateFields: CustomField[];
   addCandidateField: (field: CustomField) => void;
   removeCandidateField: (id: string) => void;
@@ -67,11 +71,11 @@ export const useSettingsStore = create<SettingsState>()(
       setWorkDayEnd: (time) => set({ workDayEnd: time }),
 
       // Recruitment Defaults
-      positions: ['Software Engineer', 'Product Manager', 'UX Designer', 'HR Specialist'],
+      positions: ['Software Engineer', 'Product Manager', 'UX Designer', 'HR Specialist', 'Intern', 'Executive', 'Jr. Executive', 'Sr. Executive'],
       addPosition: (pos) => set((state) => ({ positions: [...new Set([...state.positions, pos])] })),
       removePosition: (pos) => set((state) => ({ positions: state.positions.filter(p => p !== pos) })),
       
-      departments: ['Engineering', 'Marketing', 'Human Resources', 'Sales', 'Design'],
+      departments: ['Engineering', 'Marketing', 'Human Resources', 'Sales', 'Design', 'Merchandising'],
       addDepartment: (dept) => set((state) => ({ departments: [...new Set([...state.departments, dept])] })),
       removeDepartment: (dept) => set((state) => ({ departments: state.departments.filter(d => d !== dept) })),
       
@@ -80,12 +84,31 @@ export const useSettingsStore = create<SettingsState>()(
       removeEmploymentType: (type) => set((state) => ({ employmentTypes: state.employmentTypes.filter(t => t !== type) })),
       
       // Dynamic Custom Fields Defaults
+      customFields: [
+        { id: 'portfolio', label: 'Portfolio URL', type: 'url', required: false },
+        { id: 'expectedSalary', label: 'Expected Salary', type: 'number', required: false }
+      ],
+      addField: (field) => set((state) => ({ 
+        customFields: [...state.customFields, field],
+        candidateFields: [...state.candidateFields, field]
+      })),
+      removeField: (id) => set((state) => ({ 
+        customFields: state.customFields.filter(f => f.id !== id),
+        candidateFields: state.candidateFields.filter(f => f.id !== id)
+      })),
+
       candidateFields: [
         { id: 'portfolio', label: 'Portfolio URL', type: 'url', required: false },
         { id: 'expectedSalary', label: 'Expected Salary', type: 'number', required: false }
       ],
-      addCandidateField: (field) => set((state) => ({ candidateFields: [...state.candidateFields, field] })),
-      removeCandidateField: (id) => set((state) => ({ candidateFields: state.candidateFields.filter(f => f.id !== id) })),
+      addCandidateField: (field) => set((state) => ({ 
+        candidateFields: [...state.candidateFields, field],
+        customFields: [...state.customFields, field]
+      })),
+      removeCandidateField: (id) => set((state) => ({ 
+        candidateFields: state.candidateFields.filter(f => f.id !== id),
+        customFields: state.customFields.filter(f => f.id !== id)
+      })),
 
       employeeFields: [
         { id: 'bloodGroup', label: 'Blood Group', type: 'select', required: true, options: ['A+', 'A-', 'B+', 'B-', 'O+', 'O-', 'AB+', 'AB-'] },
