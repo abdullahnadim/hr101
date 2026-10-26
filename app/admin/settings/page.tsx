@@ -1,14 +1,26 @@
 'use client';
-import { useState, useEffect } from 'react';
-import { Save, Check, Loader2, Building, Clock, Globe, Bell } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { 
+  Save, Check, Loader2, Building, Clock, Globe, Bell, 
+  Calendar, Shield, DoorOpen, Users, Tv, MonitorPlay, Plus, Trash2 
+} from 'lucide-react';
 import { useSettingsStore } from '@/store/useSettingsStore';
+
+const tabs = [
+  { id: 'general', label: 'General & Company', icon: Building },
+  { id: 'rooms', label: 'Rooms & Spaces', icon: DoorOpen },
+  { id: 'permissions', label: 'Roles & Access', icon: Shield },
+  { id: 'leave', label: 'Leave Policies', icon: Calendar },
+  { id: 'notifications', label: 'Notifications', icon: Bell },
+];
 
 export default function GeneralSettingsPage() {
   const [mounted, setMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
+  const [activeTab, setActiveTab] = useState('general');
 
-  // Zustand Store
+  // Zustand Store for General Settings
   const { 
     companyName, setCompanyName,
     timezone, setTimezone,
@@ -16,11 +28,32 @@ export default function GeneralSettingsPage() {
     workDayEnd, setWorkDayEnd
   } = useSettingsStore();
 
-  // Local state for forms
   const [localCompany, setLocalCompany] = useState('');
   const [localTz, setLocalTz] = useState('');
   const [localStart, setLocalStart] = useState('');
   const [localEnd, setLocalEnd] = useState('');
+
+  // Server-connected Room State
+  const [rooms, setRooms] = useState<any[]>([]);
+  const [roomsLoading, setRoomsLoading] = useState(true);
+  const [roomSaving, setRoomSaving] = useState(false);
+  const [newRoom, setNewRoom] = useState({ name: '', capacity: '', amenities: [] as string[] });
+
+  // Fetch Rooms from Database
+  const fetchRooms = useCallback(async () => {
+    setRoomsLoading(true);
+    try {
+      const res = await fetch('/api/rooms');
+      if (res.ok) {
+        const data = await res.json();
+        setRooms(data);
+      }
+    } catch (error) {
+      console.error("Failed to load rooms", error);
+    } finally {
+      setRoomsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -28,118 +61,299 @@ export default function GeneralSettingsPage() {
     setLocalTz(timezone || 'Asia/Dhaka');
     setLocalStart(workDayStart || '09:00');
     setLocalEnd(workDayEnd || '18:00');
-  }, [companyName, timezone, workDayStart, workDayEnd]);
+    fetchRooms();
+  }, [companyName, timezone, workDayStart, workDayEnd, fetchRooms]);
 
   if (!mounted) return null;
 
   const handleSaveChanges = () => {
-    setIsSaving(true);
-    setTimeout(() => {
-      setCompanyName(localCompany);
-      setTimezone(localTz);
-      setWorkDayStart(localStart);
-      setWorkDayEnd(localEnd);
-      
-      setIsSaving(false);
-      setIsSaved(true);
-      setTimeout(() => setIsSaved(false), 2000);
-    }, 400);
+    if (activeTab === 'general') {
+      setIsSaving(true);
+      setTimeout(() => {
+        setCompanyName(localCompany);
+        setTimezone(localTz);
+        setWorkDayStart(localStart);
+        setWorkDayEnd(localEnd);
+        setIsSaving(false);
+        setIsSaved(true);
+        setTimeout(() => setIsSaved(false), 2000);
+      }, 500);
+    }
   };
 
+  // POST to API
+  const handleAddRoom = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newRoom.name || !newRoom.capacity) return;
+    setRoomSaving(true);
+
+    try {
+      const res = await fetch('/api/rooms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newRoom.name,
+          capacity: newRoom.capacity,
+          amenities: newRoom.amenities,
+          status: 'ACTIVE'
+        })
+      });
+
+      if (res.ok) {
+        const createdRoom = await res.json();
+        setRooms([createdRoom, ...rooms]);
+        setNewRoom({ name: '', capacity: '', amenities: [] });
+      }
+    } catch (error) {
+      alert("Failed to add room");
+    } finally {
+      setRoomSaving(false);
+    }
+  };
+
+  // DELETE to API
+  const handleDeleteRoom = async (id: string) => {
+    if(!confirm('Are you sure you want to delete this room? It will fail if there are existing bookings attached to it.')) return;
+    
+    try {
+      const res = await fetch(`/api/rooms/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setRooms(rooms.filter(r => r.id !== id));
+      } else {
+        alert("Cannot delete room. Ensure no employees have active bookings for it.");
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const toggleAmenity = (amenity: string) => {
+    setNewRoom(prev => ({
+      ...prev,
+      amenities: prev.amenities.includes(amenity) 
+        ? prev.amenities.filter(a => a !== amenity)
+        : [...prev.amenities, amenity]
+    }));
+  };
+
+  const ActiveTabObj = tabs.find(t => t.id === activeTab);
+  const ActiveIcon = ActiveTabObj?.icon;
+
   return (
-    <>
-      <header className="bg-white border-b border-neutral-200 px-8 py-5 flex justify-between items-center sticky top-0 z-10">
+    <div className="min-h-screen bg-neutral-50/30 pb-24">
+      <header className="bg-white border-b border-neutral-200 px-8 py-5 flex justify-between items-center sticky top-0 z-20 shadow-sm">
         <div>
-          <h1 className="text-xl font-semibold text-neutral-900 tracking-tight">General Settings</h1>
-          <p className="text-sm text-neutral-500 mt-1">Manage global platform configurations and working hours.</p>
+          <h1 className="text-xl font-bold text-neutral-900 tracking-tight">Platform Settings</h1>
+          <p className="text-sm text-neutral-500 mt-1">Manage global configurations, workspaces, and policies.</p>
         </div>
         
-        <button 
-          onClick={handleSaveChanges}
-          disabled={isSaving || isSaved}
-          className={`flex items-center gap-2 px-5 py-2 rounded-lg transition-all text-sm font-medium shadow-sm disabled:opacity-80 ${
-            isSaved ? 'bg-emerald-600 text-white' : 'bg-black text-white hover:bg-neutral-800'
-          }`}
-        >
-          {isSaving ? <Loader2 size={16} className="animate-spin" /> : isSaved ? <Check size={16} /> : <Save size={16} />}
-          {isSaving ? 'Saving...' : isSaved ? 'Saved!' : 'Save Changes'}
-        </button>
+        {activeTab === 'general' && (
+          <button 
+            onClick={handleSaveChanges}
+            disabled={isSaving || isSaved}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-lg transition-all text-sm font-bold shadow-sm disabled:opacity-80 ${
+              isSaved ? 'bg-emerald-600 text-white' : 'bg-black text-white hover:bg-neutral-800'
+            }`}
+          >
+            {isSaving ? <Loader2 size={16} className="animate-spin" /> : isSaved ? <Check size={16} /> : <Save size={16} />}
+            {isSaving ? 'Saving...' : isSaved ? 'Saved Successfully!' : 'Save Changes'}
+          </button>
+        )}
       </header>
 
-      <div className="p-8 max-w-4xl mx-auto space-y-6">
+      <div className="p-8 max-w-6xl mx-auto flex flex-col md:flex-row gap-8">
         
-        {/* Company Profile */}
-        <section className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50 flex items-center gap-2">
-            <Building size={18} className="text-neutral-500" />
-            <div>
-              <h2 className="font-semibold text-neutral-800">Company Profile</h2>
-              <p className="text-xs text-neutral-500 mt-0.5">Core organizational details.</p>
-            </div>
-          </div>
-          <div className="p-6">
-            <div className="max-w-md">
-              <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Company Name</label>
-              <input 
-                type="text" 
-                value={localCompany} 
-                onChange={(e) => setLocalCompany(e.target.value)}
-                className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
-              />
-            </div>
-          </div>
-        </section>
+        <aside className="w-full md:w-64 shrink-0">
+          <nav className="flex flex-col gap-1.5 sticky top-28">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
+                    isActive
+                      ? 'bg-white border border-neutral-200 text-black shadow-sm'
+                      : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 border border-transparent'
+                  }`}
+                >
+                  <Icon size={18} className={isActive ? 'text-blue-600' : 'text-neutral-400'} />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
 
-        {/* Business Hours & Region */}
-        <section className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-          <div className="px-6 py-4 border-b border-neutral-100 bg-neutral-50 flex items-center gap-2">
-            <Clock size={18} className="text-neutral-500" />
-            <div>
-              <h2 className="font-semibold text-neutral-800">Business Hours & Region</h2>
-              <p className="text-xs text-neutral-500 mt-0.5">Sets the default boundaries for scheduling and calendars.</p>
-            </div>
-          </div>
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-            
-            <div>
-              <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5 flex items-center gap-1.5"><Globe size={14}/> Timezone</label>
-              <select 
-                value={localTz} 
-                onChange={(e) => setLocalTz(e.target.value)}
-                className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm bg-white"
-              >
-                <option value="Asia/Dhaka">Asia/Dhaka (BDT)</option>
-                <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
-                <option value="America/New_York">America/New_York (EST)</option>
-                <option value="Europe/London">Europe/London (GMT)</option>
-              </select>
-            </div>
+        <div className="flex-1 space-y-6">
+          
+          {/* GENERAL TAB */}
+          {activeTab === 'general' && (
+            <>
+              <section className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+                <div className="px-6 py-5 border-b border-neutral-100 bg-gradient-to-b from-white to-neutral-50 flex items-center gap-2.5">
+                  <Building size={18} className="text-blue-600" />
+                  <div>
+                    <h2 className="font-bold text-neutral-900">Company Profile</h2>
+                    <p className="text-xs text-neutral-500 mt-0.5">Core organizational branding and details.</p>
+                  </div>
+                </div>
+                <div className="p-6 md:p-8">
+                  <div className="max-w-md">
+                    <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Legal Company Name</label>
+                    <input type="text" value={localCompany} onChange={(e) => setLocalCompany(e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm transition-shadow" placeholder="e.g. Acme Corporation" />
+                  </div>
+                </div>
+              </section>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Work Day Start</label>
-                <input 
-                  type="time" 
-                  value={localStart} 
-                  onChange={(e) => setLocalStart(e.target.value)}
-                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
-                />
+              <section className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+                <div className="px-6 py-5 border-b border-neutral-100 bg-gradient-to-b from-white to-neutral-50 flex items-center gap-2.5">
+                  <Clock size={18} className="text-blue-600" />
+                  <div>
+                    <h2 className="font-bold text-neutral-900">Business Hours & Region</h2>
+                    <p className="text-xs text-neutral-500 mt-0.5">Sets the default boundaries for schedules, payroll, and calendars.</p>
+                  </div>
+                </div>
+                <div className="p-6 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Globe size={14} className="text-neutral-400" /> Operating Timezone</label>
+                    <select value={localTz} onChange={(e) => setLocalTz(e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm bg-white cursor-pointer transition-shadow">
+                      <option value="Asia/Dhaka">Asia/Dhaka (BDT)</option>
+                      <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+                      <option value="America/New_York">America/New_York (EST)</option>
+                      <option value="Europe/London">Europe/London (GMT)</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Work Day Start</label>
+                      <input type="time" value={localStart} onChange={(e) => setLocalStart(e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm transition-shadow"/>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Work Day End</label>
+                      <input type="time" value={localEnd} onChange={(e) => setLocalEnd(e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm transition-shadow"/>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            </>
+          )}
+
+          {/* CONFERENCE ROOMS TAB */}
+          {activeTab === 'rooms' && (
+            <>
+              <section className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-6 py-5 border-b border-neutral-100 bg-gradient-to-b from-white to-neutral-50 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <DoorOpen size={18} className="text-indigo-600" />
+                    <div>
+                      <h2 className="font-bold text-neutral-900">Add Workspace</h2>
+                      <p className="text-xs text-neutral-500 mt-0.5">Register a new physical room for meetings.</p>
+                    </div>
+                  </div>
+                </div>
+                <form onSubmit={handleAddRoom} className="p-6 flex flex-col gap-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                      <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Room Name</label>
+                      <input type="text" value={newRoom.name} onChange={(e) => setNewRoom({...newRoom, name: e.target.value})} placeholder="e.g. Conference Room A" className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" required />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Max Capacity</label>
+                      <input type="number" value={newRoom.capacity} onChange={(e) => setNewRoom({...newRoom, capacity: e.target.value})} placeholder="e.g. 10" className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" required min="1" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Included Amenities</label>
+                    <div className="flex flex-wrap gap-2">
+                      {['TV', 'Video Conferencing', 'Whiteboard', 'Projector', 'Coffee Machine'].map((item) => (
+                        <button 
+                          key={item} 
+                          type="button" 
+                          onClick={() => toggleAmenity(item)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${newRoom.amenities.includes(item) ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="flex justify-end pt-2">
+                    <button type="submit" disabled={roomSaving} className="flex items-center gap-2 px-5 py-2.5 bg-black text-white rounded-lg hover:bg-neutral-800 transition-colors text-sm font-bold disabled:opacity-50">
+                      {roomSaving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Register Room
+                    </button>
+                  </div>
+                </form>
+              </section>
+
+              <section className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-6 py-5 border-b border-neutral-100 flex items-center gap-2.5 bg-neutral-50/50">
+                  <h2 className="font-bold text-neutral-900">Active Workspaces ({rooms.length})</h2>
+                </div>
+                <div className="divide-y divide-neutral-100 min-h-[100px]">
+                  {roomsLoading ? (
+                    <div className="p-8 flex justify-center text-neutral-400"><Loader2 className="animate-spin" /></div>
+                  ) : rooms.length === 0 ? (
+                    <div className="p-8 text-center text-neutral-500 text-sm">No rooms registered yet.</div>
+                  ) : (
+                    rooms.map(room => {
+                      // Safely handle amenities if Prisma returns a JSON string instead of an array
+                      let parsedAmenities = [];
+                      if (Array.isArray(room.amenities)) {
+                        parsedAmenities = room.amenities;
+                      } else if (typeof room.amenities === 'string') {
+                        try { parsedAmenities = JSON.parse(room.amenities); } catch { parsedAmenities = []; }
+                      }
+
+                      return (
+                        <div key={room.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-neutral-50/50 transition-colors">
+                          <div>
+                            <h3 className="font-bold text-neutral-900 text-base">{room.name}</h3>
+                            <div className="flex items-center gap-4 mt-2">
+                              <span className="flex items-center gap-1.5 text-xs font-medium text-neutral-600 bg-neutral-100 px-2 py-1 rounded-md">
+                                <Users size={14} /> {room.capacity} People
+                              </span>
+                              <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${room.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                                {room.status}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
+                            <div className="flex flex-wrap gap-1.5">
+                              {parsedAmenities.map((a: string, i: number) => (
+                                <span key={i} className="text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-600 px-2 py-1 rounded">
+                                  {a}
+                                </span>
+                              ))}
+                            </div>
+                            <button onClick={() => handleDeleteRoom(room.id)} className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete Room">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })
+                  )}
+                </div>
+              </section>
+            </>
+          )}
+
+          {activeTab !== 'general' && activeTab !== 'rooms' && (
+            <div className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden h-[400px] flex flex-col items-center justify-center text-center p-8">
+              <div className="w-16 h-16 bg-neutral-50 border border-neutral-100 rounded-full flex items-center justify-center mb-4 shadow-inner">
+                {ActiveIcon && <ActiveIcon size={28} className="text-neutral-300" />}
               </div>
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Work Day End</label>
-                <input 
-                  type="time" 
-                  value={localEnd} 
-                  onChange={(e) => setLocalEnd(e.target.value)}
-                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"
-                />
-              </div>
+              <h3 className="text-lg font-bold text-neutral-700">{ActiveTabObj?.label} Configurations</h3>
+              <p className="text-sm text-neutral-400 mt-2 max-w-sm">
+                This administrative module is currently being built. You will soon be able to manage {ActiveTabObj?.label?.toLowerCase()} directly from this panel.
+              </p>
             </div>
+          )}
 
-          </div>
-        </section>
-
+        </div>
       </div>
-    </>
+    </div>
   );
 }

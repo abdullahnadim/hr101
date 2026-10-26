@@ -12,38 +12,36 @@ const timeToMinutes = (timeStr: string) => {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { employeeId, teamName, reason, date, startTime, durationMinutes, status } = body;
+    const { employeeId, teamName, reason, date, startTime, durationMinutes, status, roomName } = body;
 
-    // 1. Calculate the start and end time in minutes for the new request
     const newStart = timeToMinutes(startTime);
     const newEnd = newStart + parseInt(durationMinutes);
 
-    // 2. Fetch all APPROVED bookings for this specific date
+    // Fetch existing APPROVED bookings for this specific room and date
     const existingBookings = await prisma.roomBooking.findMany({
       where: {
         date: new Date(date),
         status: 'APPROVED',
+        roomName: roomName || 'FAL Conference Room' // Scope collisions to the specific room
       }
     });
 
-    // 3. Collision Detection Math
     let isConflict = false;
     for (const booking of existingBookings) {
       const existingStart = timeToMinutes(booking.startTime);
       const existingEnd = existingStart + booking.durationMinutes;
 
-      // Overlap formula: (Start A < End B) and (End A > Start B)
       if (newStart < existingEnd && newEnd > existingStart) {
         isConflict = true;
         break;
       }
     }
 
-    // 4. Save the request. If there's a conflict, flag it. Otherwise use the requested status (allows admin/ATS auto-approve).
     const finalStatus = isConflict ? 'CONFLICT' : (status || 'PENDING');
 
     const newBooking = await prisma.roomBooking.create({
       data: {
+        roomName: roomName || 'FAL Conference Room',
         employeeId,
         teamName,
         reason,
@@ -57,7 +55,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ 
       success: true, 
       booking: newBooking, 
-      message: isConflict ? 'Time slot conflict detected. Forwarded to Admin for resolution.' : 'Request processed successfully.' 
+      message: isConflict ? 'Time slot conflict detected for this room. Forwarded to Admin.' : 'Request processed successfully.' 
     });
 
   } catch (error) {

@@ -86,9 +86,27 @@ model Employee {
   updatedAt       DateTime       @updatedAt
 }
 
+model Room {
+  id          String        @id @default(cuid())
+  orgId       String
+  name        String
+  capacity    Int
+  amenities   Json?
+  status      String        @default("ACTIVE")
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  bookings    RoomBooking[]
+}
+
 // NEW: FAL Conference Room Booking Model
 model RoomBooking {
   id              String    @id @default(uuid())
+  
+  // Link booking directly to the physical Room
+  roomId          String?
+  room            Room?     @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  
   roomName        String    @default("FAL Conference Room")
   
   employeeId      String
@@ -100,12 +118,13 @@ model RoomBooking {
   startTime       String    // Format: "14:30"
   durationMinutes Int
   
-  // PENDING (Normal), APPROVED, REJECTED, CONFLICT (Overlap - Needs Admin)
   status          String    @default("PENDING") 
   
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 }
+
+
 
 model Interview {
   id              String    @id @default(uuid())

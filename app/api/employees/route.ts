@@ -10,6 +10,7 @@ export async function GET() {
     });
     return NextResponse.json(employees);
   } catch (error) {
+    console.error("Error fetching employees:", error);
     return NextResponse.json({ error: 'Failed to fetch employees' }, { status: 500 });
   }
 }
@@ -20,24 +21,34 @@ export async function POST(request: Request) {
     const org = await prisma.organization.findFirst();
     if (!org) throw new Error("Organization not found");
 
+    // Parse the JSON for the new employee record
+    const rawDynamicData = body.customData || body.notes;
+    const parsedCustomData = typeof rawDynamicData === 'string' ? JSON.parse(rawDynamicData) : rawDynamicData || null;
+
     const newEmployee = await prisma.employee.create({
       data: {
         orgId: org.id,
-        employeeCode: body.employeeCode, 
+        employeeCode: body.employeeCode || `EMP-${Math.floor(1000 + Math.random() * 9000)}`, 
         name: body.name,
-        email: body.email || null, // FIX: Prevents empty string crashes
+        email: body.email || null,
         phone: body.phone,
         position: body.position,
         department: body.department,
-        joiningDate: new Date(body.joiningDate),
+        status: body.status || 'ACTIVE',
+        joiningDate: body.joiningDate || body.joinDate ? new Date(body.joiningDate || body.joinDate) : new Date(),
+        
+        // FIXED: Only customData is passed to Prisma now
+        customData: parsedCustomData, 
       }
     });
 
     return NextResponse.json(newEmployee);
   } catch (error) {
+    console.error("Error creating employee:", error);
     return NextResponse.json({ error: 'Failed to create employee' }, { status: 500 });
   }
 }
+
 export async function DELETE(request: Request) {
   try {
     const { ids } = await request.json();
@@ -54,6 +65,7 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    console.error("Error deleting employees:", error);
     return NextResponse.json({ error: 'Failed to delete employees' }, { status: 500 });
   }
 }
