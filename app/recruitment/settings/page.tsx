@@ -115,9 +115,9 @@ export default function RecruitmentSettingsPage() {
   ];
 
   const handleInsertVariable = (variable: string) => {
-    let currentRef;
+    let currentRef: HTMLTextAreaElement | null = null;
     let currentValue = '';
-    let setter;
+    let setter: ((value: string) => void) | undefined = undefined;
 
     if (activeTab === 'whatsapp') { 
       currentRef = whatsappRef.current; 
@@ -135,10 +135,12 @@ export default function RecruitmentSettingsPage() {
       setter = setLocalSmsTemplate; 
     }
 
-    if (currentRef) {
+    // Safely check if setter exists before invoking
+    if (currentRef && setter) {
       const start = currentRef.selectionStart;
       const end = currentRef.selectionEnd;
       const newValue = currentValue.substring(0, start) + variable + currentValue.substring(end);
+      
       setter(newValue);
       
       // Re-focus and set cursor position after inserting
@@ -146,8 +148,8 @@ export default function RecruitmentSettingsPage() {
         currentRef.focus();
         currentRef.setSelectionRange(start + variable.length, start + variable.length);
       }, 0);
-    } else {
-      // Fallback if no ref is focused (just append to the end)
+    } else if (setter) {
+      // Fallback if no ref is focused
       setter(currentValue + ' ' + variable);
     }
   };
