@@ -93,7 +93,11 @@ export default function RecruitmentSettingsPage() {
     setTimeout(() => {
       setEmailTemplate(localEmailTemplate);
       setSmsTemplate(localSmsTemplate);
-      if (setWhatsappTemplate) setWhatsappTemplate(localWhatsappTemplate);
+      
+      // FIXED: Use optional chaining to satisfy TypeScript's strict checks
+      if (setWhatsappTemplate) {
+        setWhatsappTemplate(localWhatsappTemplate);
+      }
       
       setIsSaving(false);
       setIsSaved(true);
