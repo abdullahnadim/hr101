@@ -3,7 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Users, Calendar, Settings, CalendarClock, Briefcase, Building, LogIn, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, Calendar, Settings, CalendarClock, Briefcase, Building, LogIn, LogOut, SlidersHorizontal } from "lucide-react";
 
 export function AppNavigation({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession();
@@ -44,6 +44,9 @@ export function AppNavigation({ children }: { children: React.ReactNode }) {
                 <Link href="/recruitment" className={pathname === '/recruitment' ? linkClass('/recruitment') : 'flex items-center gap-3 px-3 py-2 rounded-md font-medium text-sm transition-colors text-neutral-600 hover:bg-neutral-50'}><LayoutDashboard size={18} className="text-neutral-400" /> ATS Dashboard</Link>
                 <Link href="/recruitment/candidates" className={linkClass('/recruitment/candidates')}><Users size={18} className="text-neutral-400" /> Candidates</Link>
                 <Link href="/recruitment/calendar" className={linkClass('/recruitment/calendar')}><Calendar size={18} className="text-neutral-400" /> Interviews</Link>
+                {isAdmin && (
+                  <Link href="/recruitment/settings" className={linkClass('/recruitment/settings')}><SlidersHorizontal size={18} className="text-neutral-400" /> ATS Settings</Link>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -60,7 +63,7 @@ export function AppNavigation({ children }: { children: React.ReactNode }) {
           {isAdmin && (
             <div className="space-y-1">
               <div className="px-3 mb-2 text-xs font-bold text-neutral-400 uppercase tracking-wider">System</div>
-              <Link href="/settings" className={linkClass('/settings')}><Settings size={18} className="text-neutral-400" /> Settings</Link>
+              <Link href="/admin/settings" className={linkClass('/admin/settings')}><Settings size={18} className="text-neutral-400" /> General Settings</Link>
             </div>
           )}
         </nav>
@@ -82,7 +85,7 @@ export function AppNavigation({ children }: { children: React.ReactNode }) {
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col h-full overflow-y-auto pb-16 md:pb-0">
         {children}
-        <footer className="w-full text-center py-6 mt-auto text-xs font-medium text-neutral-400">Developed by Mir</footer>
+        
       </main>
 
       {/* Mobile Bottom Navigation (Conditionally Rendered) */}

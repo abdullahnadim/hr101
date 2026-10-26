@@ -48,6 +48,7 @@ model Candidate {
   status          String       @default("NEW") 
   messageStatus   String       @default("NOT_SENT") 
   notes           String?
+  customData  Json?
   
   scoreTech       Int?
   scoreComm       Int?
@@ -75,6 +76,7 @@ model Employee {
   phone           String
   position        String
   department      String
+  customData  Json?
   joiningDate     DateTime       // Added field
   status          String         @default("ACTIVE") 
   
