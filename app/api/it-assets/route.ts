@@ -38,7 +38,7 @@ export async function POST(request: Request) {
         notes: body.notes || null,
         location: body.location || null,
         ipAddress: body.ipAddress || null,
-        specs: body.specs ? JSON.stringify(body.specs) : null,
+        specs: body.specs ? (typeof body.specs === 'string' ? JSON.parse(body.specs) : body.specs) : undefined,
         credentials: body.credentials ? JSON.stringify(body.credentials) : null,
       },
       include: { assignedTo: true }

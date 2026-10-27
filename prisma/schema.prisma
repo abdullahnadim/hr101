@@ -229,9 +229,11 @@ model ITAsset {
   serialNumber  String?   
   condition     String    @default("GOOD")      
   status        String    @default("AVAILABLE") 
-  location      String?
-  ipAddress     String?
-  specs         Json?
+  location      String?   
+  ipAddress     String?   
+  specs         Json?     
+  credentials   String?   // <--- Add this missing field to match your API route
+
   assignedToId  String?
   assignedTo    Employee? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
   notes         String?
