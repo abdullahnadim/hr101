@@ -17,6 +17,8 @@ export async function PATCH(
         condition: body.condition,
         status: body.status,
         assignedToId: body.assignedToId || null,
+        location: body.location,
+        ipAddress: body.ipAddress,
         notes: body.notes
       },
       include: {

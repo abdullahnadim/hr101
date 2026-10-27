@@ -2,7 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
   Users, Search, Plus, Loader2, Mail, Phone, 
-  Briefcase, Calendar, Building, X, CheckCircle2, Trash2, Edit3, FileText 
+  Briefcase, Calendar, Building, X, CheckCircle2, Trash2, Edit3, Eye 
 } from 'lucide-react';
 import Link from 'next/link';
 import EditEmployeeModal from '@/components/EditEmployeeModal';
@@ -206,18 +206,19 @@ export default function EmployeesPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right space-x-1">
+                      {/* UPDATED: Profile Link with Eye Icon */}
                       <Link 
-                        href={`/admin/payroll?employeeId=${emp.id}`}
+                        href={`/admin/employees/${emp.id}`}
                         className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-bold text-neutral-700 hover:bg-neutral-100 rounded-lg transition-colors border border-neutral-200"
-                        title="View Payslips"
+                        title="View Full Profile"
                       >
-                        <FileText size={14} /> View
+                        <Eye size={14} /> View
                       </Link>
                       
                       <button 
                         onClick={() => setEditingEmployee(emp)}
                         className="p-2 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors inline-block align-middle" 
-                        title="Edit Profile"
+                        title="Edit Quick Details"
                       >
                         <Edit3 size={16} />
                       </button>

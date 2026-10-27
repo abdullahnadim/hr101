@@ -2,34 +2,41 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
   Calculator, Search, Filter, Loader2, DollarSign, 
-  FileText, Download, CheckCircle2, TrendingUp, TrendingDown,
-  Bus, Car
+  FileText, Download, TrendingUp, TrendingDown, Bus
 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
 
 export default function PayrollDashboard() {
+  const searchParams = useSearchParams();
+  const preSelectedEmployee = searchParams.get('employeeId');
+
   const [payslips, setPayslips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   
-  // Default to current month/year
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(currentDate.getFullYear());
+  const [searchQuery, setSearchQuery] = useState('');
 
   const fetchPayslips = useCallback(async () => {
     setLoading(true);
     try {
-      // In a real app, you would create a GET route for /api/payroll to fetch these
-      // For now, we will simulate fetching until we build the GET route
-      const res = await fetch(`/api/payroll?month=${selectedMonth}&year=${selectedYear}`);
-      if (res.ok) setPayslips(await res.json());
-      else setPayslips([]);
+      let url = `/api/payroll?month=${selectedMonth}&year=${selectedYear}`;
+      if (preSelectedEmployee) url += `&employeeId=${preSelectedEmployee}`;
+      
+      const res = await fetch(url);
+      if (res.ok) {
+        setPayslips(await res.json());
+      } else {
+        setPayslips([]);
+      }
     } catch (error) {
       console.error(error);
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth, selectedYear]);
+  }, [selectedMonth, selectedYear, preSelectedEmployee]);
 
   useEffect(() => {
     fetchPayslips();
@@ -51,7 +58,7 @@ export default function PayrollDashboard() {
         alert(`Successfully generated ${data.count} payslips!`);
         fetchPayslips();
       } else {
-        alert(data.error);
+        alert(data.error || "Failed to generate payroll");
       }
     } catch (error) {
       alert("Failed to run payroll cycle.");
@@ -60,13 +67,16 @@ export default function PayrollDashboard() {
     }
   };
 
-  // Format currency
-  const formatTk = (amount: number) => `৳${amount.toLocaleString('en-IN')}`;
+  const formatTk = (amount: number) => `৳${(amount || 0).toLocaleString('en-IN')}`;
+
+  const filteredPayslips = payslips.filter(ps => 
+    ps.employee?.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    ps.employee?.employeeCode?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8 pb-24">
       
-      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">Payroll Processing</h1>
@@ -84,7 +94,6 @@ export default function PayrollDashboard() {
 
       <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-[600px]">
         
-        {/* Controls */}
         <div className="p-4 border-b border-neutral-100 bg-neutral-50/50 flex flex-col sm:flex-row gap-4 justify-between items-center">
           <div className="flex items-center gap-3">
             <select 
@@ -112,77 +121,84 @@ export default function PayrollDashboard() {
             <input 
               type="text" 
               placeholder="Search employee..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-black transition-colors"
             />
           </div>
         </div>
 
-        {/* Data Table */}
         <div className="flex-1 overflow-x-auto">
           {loading ? (
             <div className="h-full flex items-center justify-center py-20"><Loader2 className="animate-spin text-neutral-400" size={24}/></div>
-          ) : payslips.length === 0 ? (
+          ) : filteredPayslips.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-neutral-500 py-20">
               <DollarSign size={48} className="text-neutral-200 mb-4" />
-              <p className="font-medium text-neutral-900 mb-1">No payslips generated for this period.</p>
-              <p className="text-sm">Click "Run Payroll Cycle" to calculate earnings and deductions.</p>
+              <p className="font-medium text-neutral-900 mb-1">No payslips found.</p>
+              <p className="text-sm">Adjust your search or click "Run Payroll Cycle".</p>
             </div>
           ) : (
             <table className="w-full text-sm text-left whitespace-nowrap">
               <thead className="bg-neutral-50 text-neutral-600 font-semibold border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
                   <th className="px-6 py-4">Employee</th>
-                  <th className="px-6 py-4">Gross Salary</th>
-                  <th className="px-6 py-4">Transport Allowance</th>
-                  <th className="px-6 py-4">Route Deduction</th>
-                  <th className="px-6 py-4">Other Deductions</th>
+                  <th className="px-6 py-4">Gross Earnings</th>
+                  <th className="px-6 py-4">Allowances</th>
+                  <th className="px-6 py-4">Transport/Tax</th>
+                  <th className="px-6 py-4">Loans/Advances</th>
                   <th className="px-6 py-4">Net Pay</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
-                {payslips.map(ps => (
-                  <tr key={ps.id} className="hover:bg-neutral-50/80 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-neutral-900">{ps.employee?.name || 'Unknown'}</div>
-                      <div className="text-xs text-neutral-500 font-mono mt-0.5">{ps.employee?.employeeCode || 'ID Pending'}</div>
-                    </td>
-                    <td className="px-6 py-4 font-medium text-neutral-700">
-                      {formatTk(ps.grossSalary)}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="flex items-center gap-1.5 text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded w-fit text-xs">
-                        <TrendingUp size={14} /> +{formatTk(ps.transportAllowance)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      {ps.transportDeduction > 0 ? (
-                        <span className="flex items-center gap-1.5 text-red-600 font-bold bg-red-50 px-2 py-1 rounded w-fit text-xs">
-                          <Bus size={14} /> -{formatTk(ps.transportDeduction)}
+                {filteredPayslips.map(ps => {
+                  const totalAllowances = (ps.medicalAllowance || 0) + (ps.transportAllowance || 0) + (ps.mobileBillAllocated || 0);
+                  const totalDeductions = (ps.transportDeduction || 0) + (ps.taxDeduction || 0);
+                  const totalLoans = (ps.loanDeduction || 0) + (ps.advanceDeduction || 0);
+
+                  return (
+                    <tr key={ps.id} className="hover:bg-neutral-50/80 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-neutral-900">{ps.employee?.name || 'Unknown'}</div>
+                        <div className="text-xs text-neutral-500 font-mono mt-0.5">{ps.employee?.employeeCode || 'ID Pending'}</div>
+                      </td>
+                      <td className="px-6 py-4 font-medium text-neutral-700">
+                        {formatTk(ps.grossSalary)}
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="flex items-center gap-1.5 text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded w-fit text-xs">
+                          <TrendingUp size={14} /> +{formatTk(totalAllowances)}
                         </span>
-                      ) : (
-                        <span className="text-neutral-400 text-xs italic">Own Commute</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      {(ps.loanDeduction + ps.advanceDeduction + ps.taxDeduction) > 0 ? (
-                        <span className="flex items-center gap-1.5 text-red-600 font-bold bg-red-50 px-2 py-1 rounded w-fit text-xs">
-                          <TrendingDown size={14} /> -{formatTk(ps.loanDeduction + ps.advanceDeduction + ps.taxDeduction)}
-                        </span>
-                      ) : (
-                        <span className="text-neutral-400 text-xs">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 font-black text-black text-base">
-                      {formatTk(ps.netPay)}
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <button className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 text-neutral-600 hover:text-black hover:border-black transition-colors text-xs font-bold shadow-sm">
-                        <Download size={14} /> Payslip
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="px-6 py-4">
+                        {totalDeductions > 0 ? (
+                          <span className="flex items-center gap-1.5 text-red-600 font-bold bg-red-50 px-2 py-1 rounded w-fit text-xs">
+                            <TrendingDown size={14} /> -{formatTk(totalDeductions)}
+                          </span>
+                        ) : (
+                          <span className="text-neutral-400 text-xs italic">No Deductions</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        {totalLoans > 0 ? (
+                          <span className="flex items-center gap-1.5 text-red-600 font-bold bg-red-50 px-2 py-1 rounded w-fit text-xs">
+                            <TrendingDown size={14} /> -{formatTk(totalLoans)}
+                          </span>
+                        ) : (
+                          <span className="text-neutral-400 text-xs">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 font-black text-black text-base">
+                        {formatTk(ps.netPay)}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 text-neutral-600 hover:text-black hover:border-black transition-colors text-xs font-bold shadow-sm">
+                          <Download size={14} /> PDF
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           )}

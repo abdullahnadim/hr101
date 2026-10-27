@@ -1,19 +1,19 @@
 'use client';
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
-  Monitor, Laptop, Mouse, Keyboard, Battery, Plug, Cpu,
-  Search, Plus, Filter, Loader2, MoreVertical, Wrench, CheckCircle2, User, Trash2
+  Monitor, Laptop, Mouse, Keyboard, Battery, Plug, Cpu, Video, Printer, Phone,
+  Search, Plus, Filter, Loader2, Wrench, CheckCircle2, User, Trash2, Download
 } from 'lucide-react';
 
 const ASSET_CATEGORIES = [
   { id: 'Laptop', icon: Laptop },
-  { id: 'PC', icon: Cpu },
+  { id: 'Desktop', icon: Cpu },
+  { id: 'Printer', icon: Printer },
+  { id: 'IP_Phone', icon: Phone },
+  { id: 'CC_Camera', icon: Video },
   { id: 'Monitor', icon: Monitor },
-  { id: 'Keyboard', icon: Keyboard },
-  { id: 'Mouse', icon: Mouse },
   { id: 'UPS', icon: Battery },
-  { id: 'Multiplug', icon: Plug },
-  { id: 'Other', icon: Monitor }
+  { id: 'Accessories', icon: Mouse }
 ];
 
 export default function ITDashboard() {
@@ -21,19 +21,25 @@ export default function ITDashboard() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Modals
+  // Modals & States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [activeAsset, setActiveAsset] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  // Search & Filter
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('ALL');
 
-  // Form States
-  const [newAsset, setNewAsset] = useState({ name: '', category: 'Laptop', serialNumber: '', condition: 'NEW', status: 'AVAILABLE', notes: '' });
-  const [editData, setEditData] = useState({ condition: '', status: '', assignedToId: '', notes: '' });
+  // Form States (Expanded for dynamic specs)
+  const defaultAsset = { 
+    name: '', category: 'Laptop', serialNumber: '', condition: 'NEW', status: 'AVAILABLE', location: '', ipAddress: '',
+    specs: { processor: '', ram: '', storage: '' },
+    credentials: { email: '', emailPassword: '', nasFolder: '', nasPassword: '' },
+    notes: '' 
+  };
+  
+  const [newAsset, setNewAsset] = useState(defaultAsset);
+  const [editData, setEditData] = useState({ condition: '', status: '', assignedToId: '', location: '', ipAddress: '', notes: '' });
 
   const fetchData = useCallback(async () => {
     try {
@@ -66,6 +72,31 @@ export default function ITDashboard() {
     return matchesSearch && matchesCategory;
   });
 
+  const handleExportCSV = () => {
+    const headers = ['Serial No', 'Brand/Model', 'Category', 'User Name', 'Department', 'Location', 'IP Address', 'Condition', 'Status'];
+    
+    const csvData = filteredAssets.map(a => [
+      a.serialNumber || 'N/A',
+      a.name,
+      a.category,
+      a.assignedTo?.name || 'Unassigned',
+      a.assignedTo?.department || 'N/A',
+      a.location || 'N/A',
+      a.ipAddress || 'N/A',
+      a.condition,
+      a.status
+    ]);
+
+    const csvContent = [headers.join(','), ...csvData.map(row => row.map(cell => `"${cell}"`).join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute('download', `IT_Assets_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const handleAddAsset = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -78,7 +109,7 @@ export default function ITDashboard() {
       if (res.ok) {
         setAssets([await res.json(), ...assets]);
         setIsAddModalOpen(false);
-        setNewAsset({ name: '', category: 'Laptop', serialNumber: '', condition: 'NEW', status: 'AVAILABLE', notes: '' });
+        setNewAsset(defaultAsset);
       }
     } catch (error) { alert("Failed to add asset."); } finally { setSubmitting(false); }
   };
@@ -87,7 +118,6 @@ export default function ITDashboard() {
     e.preventDefault();
     setSubmitting(true);
     
-    // Auto-update status based on assignment
     let finalStatus = editData.status;
     if (editData.assignedToId && finalStatus === 'AVAILABLE') finalStatus = 'ASSIGNED';
     if (!editData.assignedToId && finalStatus === 'ASSIGNED') finalStatus = 'AVAILABLE';
@@ -120,6 +150,8 @@ export default function ITDashboard() {
       condition: asset.condition, 
       status: asset.status, 
       assignedToId: asset.assignedToId || '', 
+      location: asset.location || '',
+      ipAddress: asset.ipAddress || '',
       notes: asset.notes || '' 
     });
     setIsEditModalOpen(true);
@@ -136,14 +168,18 @@ export default function ITDashboard() {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">IT Asset Management</h1>
-          <p className="text-neutral-500 mt-1">Track hardware inventory, conditions, and employee assignments.</p>
+          <p className="text-neutral-500 mt-1">Track hardware inventory, specs, and employee network configurations.</p>
         </div>
-        <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 bg-black text-white text-sm font-bold rounded-lg hover:bg-neutral-800 transition-colors shadow-sm">
-          <Plus size={16} /> Register Asset
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={handleExportCSV} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-neutral-200 text-neutral-700 text-sm font-bold rounded-lg hover:bg-neutral-50 transition-colors shadow-sm">
+            <Download size={16} /> Export CSV
+          </button>
+          <button onClick={() => setIsAddModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 bg-black text-white text-sm font-bold rounded-lg hover:bg-neutral-800 transition-colors shadow-sm">
+            <Plus size={16} /> Register Asset
+          </button>
+        </div>
       </div>
 
-      {/* Metrics Row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm">
           <p className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Total Inventory</p>
@@ -164,13 +200,12 @@ export default function ITDashboard() {
       </div>
 
       <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden flex flex-col h-[600px]">
-        {/* Controls */}
         <div className="p-4 border-b border-neutral-100 bg-neutral-50/50 flex flex-col sm:flex-row gap-4 justify-between items-center">
           <div className="relative w-full sm:w-80">
             <Search className="absolute left-3 top-2.5 text-neutral-400" size={16} />
             <input 
               type="text" 
-              placeholder="Search by name, serial, or employee..." 
+              placeholder="Search by model, serial, or user..." 
               value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-9 pr-4 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-black transition-colors"
             />
@@ -184,7 +219,6 @@ export default function ITDashboard() {
           </div>
         </div>
 
-        {/* Data Table */}
         <div className="flex-1 overflow-auto">
           {loading ? (
             <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-neutral-400" size={24}/></div>
@@ -197,15 +231,18 @@ export default function ITDashboard() {
             <table className="w-full text-sm text-left whitespace-nowrap">
               <thead className="bg-neutral-50 text-neutral-600 font-semibold border-b border-neutral-200 sticky top-0 z-10">
                 <tr>
-                  <th className="px-6 py-4">Asset Details</th>
+                  <th className="px-6 py-4">Asset Details & Config</th>
+                  <th className="px-6 py-4">Location</th>
                   <th className="px-6 py-4">Condition</th>
-                  <th className="px-6 py-4">Status & Assignment</th>
+                  <th className="px-6 py-4">Assignment</th>
                   <th className="px-6 py-4 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-neutral-100">
                 {filteredAssets.map(asset => {
                   const Icon = getCategoryIcon(asset.category);
+                  const specs = asset.specs ? JSON.parse(asset.specs) : null;
+                  
                   return (
                     <tr key={asset.id} className="hover:bg-neutral-50 transition-colors">
                       <td className="px-6 py-4">
@@ -215,10 +252,13 @@ export default function ITDashboard() {
                           </div>
                           <div>
                             <p className="font-bold text-neutral-900">{asset.name}</p>
-                            <p className="text-xs text-neutral-500 font-mono mt-0.5">{asset.serialNumber || 'No Serial'}</p>
+                            <p className="text-[10px] text-neutral-500 font-mono mt-0.5 tracking-wider">
+                              SN: {asset.serialNumber || 'N/A'} {asset.ipAddress && `| IP: ${asset.ipAddress}`}
+                            </p>
                           </div>
                         </div>
                       </td>
+                      <td className="px-6 py-4 font-medium text-neutral-700">{asset.location || '-'}</td>
                       <td className="px-6 py-4">
                         <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
                           asset.condition === 'NEW' || asset.condition === 'GOOD' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
@@ -229,14 +269,9 @@ export default function ITDashboard() {
                       </td>
                       <td className="px-6 py-4">
                         {asset.status === 'ASSIGNED' && asset.assignedTo ? (
-                          <div className="flex items-center gap-2">
-                            <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center text-xs font-bold shrink-0">
-                              {asset.assignedTo.name.charAt(0)}
-                            </div>
-                            <div>
-                              <p className="font-semibold text-neutral-900 leading-tight">{asset.assignedTo.name}</p>
-                              <p className="text-[10px] text-neutral-500 uppercase">{asset.assignedTo.department}</p>
-                            </div>
+                          <div>
+                            <p className="font-semibold text-neutral-900">{asset.assignedTo.name}</p>
+                            <p className="text-[10px] text-neutral-500 uppercase">{asset.assignedTo.department}</p>
                           </div>
                         ) : (
                           <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
@@ -267,29 +302,66 @@ export default function ITDashboard() {
       {/* --- ADD ASSET MODAL --- */}
       {isAddModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-6 md:p-8">
-            <h2 className="text-xl font-bold text-neutral-900 mb-1">Register New Hardware</h2>
-            <p className="text-sm text-neutral-500 mb-6">Add a new IT asset to the company inventory.</p>
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-neutral-100">
+              <h2 className="text-xl font-bold text-neutral-900">Register New Asset</h2>
+              <p className="text-sm text-neutral-500">Configure hardware specs and network details.</p>
+            </div>
             
-            <form onSubmit={handleAddAsset} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Asset Name / Model *</label>
-                <input type="text" required value={newAsset.name} onChange={e => setNewAsset({...newAsset, name: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg outline-none focus:border-black text-sm" placeholder="e.g. MacBook Pro M2" />
+            <form onSubmit={handleAddAsset} className="p-6 overflow-y-auto space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Brand / Model *</label>
+                  <input type="text" required value={newAsset.name} onChange={e => setNewAsset({...newAsset, name: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm outline-none focus:border-black" placeholder="e.g. HP EliteBook 840 G6" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Serial No *</label>
+                  <input type="text" required value={newAsset.serialNumber} onChange={e => setNewAsset({...newAsset, serialNumber: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm outline-none focus:border-black" placeholder="e.g. FAL/HO/IT/LP02" />
+                </div>
               </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Category</label>
-                  <select value={newAsset.category} onChange={e => setNewAsset({...newAsset, category: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg outline-none focus:border-black text-sm bg-white">
+                  <select value={newAsset.category} onChange={e => setNewAsset({...newAsset, category: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm outline-none focus:border-black">
                     {ASSET_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.id}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Serial / Tag Number</label>
-                  <input type="text" value={newAsset.serialNumber} onChange={e => setNewAsset({...newAsset, serialNumber: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg outline-none focus:border-black text-sm" placeholder="e.g. SN-998822" />
+                  <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Location</label>
+                  <input type="text" value={newAsset.location} onChange={e => setNewAsset({...newAsset, location: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm outline-none focus:border-black" placeholder="e.g. HR Room / Reception" />
                 </div>
               </div>
-              
-              <div className="flex justify-end gap-3 pt-4 mt-2 border-t border-neutral-100">
+
+              {(newAsset.category === 'Laptop' || newAsset.category === 'Desktop') && (
+                <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-100 grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Processor</label>
+                    <input type="text" value={newAsset.specs.processor} onChange={e => setNewAsset({...newAsset, specs: {...newAsset.specs, processor: e.target.value}})} className="w-full p-2 border border-neutral-200 rounded text-sm outline-none focus:border-black" placeholder="Core i3 10th Gen" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">RAM</label>
+                    <input type="text" value={newAsset.specs.ram} onChange={e => setNewAsset({...newAsset, specs: {...newAsset.specs, ram: e.target.value}})} className="w-full p-2 border border-neutral-200 rounded text-sm outline-none focus:border-black" placeholder="12GB" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Storage</label>
+                    <input type="text" value={newAsset.specs.storage} onChange={e => setNewAsset({...newAsset, specs: {...newAsset.specs, storage: e.target.value}})} className="w-full p-2 border border-neutral-200 rounded text-sm outline-none focus:border-black" placeholder="SSD: 120GB, HDD: 1TB" />
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Static IP Address</label>
+                  <input type="text" value={newAsset.ipAddress} onChange={e => setNewAsset({...newAsset, ipAddress: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm outline-none focus:border-black" placeholder="e.g. 192.168.102.211" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Internal Notes</label>
+                  <input type="text" value={newAsset.notes} onChange={e => setNewAsset({...newAsset, notes: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm outline-none focus:border-black" />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
                 <button type="button" onClick={() => setIsAddModalOpen(false)} className="px-4 py-2.5 text-sm font-bold text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors">Cancel</button>
                 <button type="submit" disabled={submitting} className="px-5 py-2.5 bg-black text-white text-sm font-bold rounded-lg hover:bg-neutral-800 disabled:opacity-50 flex items-center gap-2">
                   {submitting ? <Loader2 size={16} className="animate-spin" /> : 'Save Asset'}
@@ -304,8 +376,8 @@ export default function ITDashboard() {
       {isEditModalOpen && activeAsset && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl p-6 md:p-8">
-            <h2 className="text-xl font-bold text-neutral-900 mb-1">Manage: {activeAsset.name}</h2>
-            <p className="text-sm text-neutral-500 mb-6 font-mono">{activeAsset.serialNumber || 'No Serial Tag'}</p>
+            <h2 className="text-xl font-bold text-neutral-900 mb-1">Manage Assignment</h2>
+            <p className="text-sm text-neutral-500 mb-6 font-mono">{activeAsset.serialNumber}</p>
             
             <form onSubmit={handleUpdateAsset} className="space-y-4">
               
@@ -321,8 +393,8 @@ export default function ITDashboard() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Hardware Condition</label>
-                  <select value={editData.condition} onChange={e => setEditData({...editData, condition: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg outline-none text-sm bg-white">
+                  <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Condition</label>
+                  <select value={editData.condition} onChange={e => setEditData({...editData, condition: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm bg-white outline-none">
                     <option value="NEW">NEW</option>
                     <option value="GOOD">GOOD</option>
                     <option value="FAIR">FAIR</option>
@@ -331,25 +403,15 @@ export default function ITDashboard() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">System Status</label>
-                  <select value={editData.status} onChange={e => setEditData({...editData, status: e.target.value})} disabled={!!editData.assignedToId} className="w-full p-2.5 border border-neutral-300 rounded-lg outline-none text-sm bg-white disabled:bg-neutral-100 disabled:text-neutral-500 cursor-not-allowed">
-                    <option value="AVAILABLE">AVAILABLE</option>
-                    <option value="ASSIGNED">ASSIGNED (Auto)</option>
-                    <option value="MAINTENANCE">MAINTENANCE</option>
-                    <option value="RETIRED">RETIRED</option>
-                  </select>
+                  <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Location / IP</label>
+                  <input type="text" value={editData.location} onChange={e => setEditData({...editData, location: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm outline-none focus:border-black" placeholder="Location" />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Internal Notes</label>
-                <textarea rows={2} value={editData.notes} onChange={e => setEditData({...editData, notes: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg outline-none focus:border-black text-sm resize-none" placeholder="e.g. Scratched screen, replaced battery 2026..." />
-              </div>
-              
               <div className="flex justify-end gap-3 pt-4 mt-2 border-t border-neutral-100">
                 <button type="button" onClick={() => setIsEditModalOpen(false)} className="px-4 py-2.5 text-sm font-bold text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors">Cancel</button>
                 <button type="submit" disabled={submitting} className="px-5 py-2.5 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 shadow-sm">
-                  {submitting ? <Loader2 size={16} className="animate-spin" /> : 'Update Hardware'}
+                  {submitting ? <Loader2 size={16} className="animate-spin" /> : 'Update Assignment'}
                 </button>
               </div>
             </form>

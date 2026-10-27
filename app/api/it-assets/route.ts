@@ -36,6 +36,10 @@ export async function POST(request: Request) {
         condition: body.condition || 'NEW',
         status: body.status || 'AVAILABLE',
         notes: body.notes || null,
+        location: body.location || null,
+        ipAddress: body.ipAddress || null,
+        specs: body.specs ? JSON.stringify(body.specs) : null,
+        credentials: body.credentials ? JSON.stringify(body.credentials) : null,
       },
       include: { assignedTo: true }
     });
