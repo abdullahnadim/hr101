@@ -230,6 +230,7 @@ model ITAsset {
   condition     String    @default("GOOD")      
   status        String    @default("AVAILABLE") 
   location      String?
+  ipAddress     String?
   assignedToId  String?
   assignedTo    Employee? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
   notes         String?
