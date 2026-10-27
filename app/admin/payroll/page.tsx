@@ -1,19 +1,21 @@
 'use client';
 export const dynamic = 'force-dynamic';
-import { useState, useEffect, useCallback } from 'react';
+
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { 
   Calculator, Search, Filter, Loader2, DollarSign, 
-  FileText, Download, TrendingUp, TrendingDown, Bus
+  FileText, Download, TrendingUp, TrendingDown, Bus, X, Printer
 } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 
-export default function PayrollDashboard() {
+function PayrollContent() {
   const searchParams = useSearchParams();
   const preSelectedEmployee = searchParams.get('employeeId');
 
   const [payslips, setPayslips] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [selectedPayslip, setSelectedPayslip] = useState<any | null>(null); // For PDF/Payslip Modal view
   
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
@@ -78,6 +80,7 @@ export default function PayrollDashboard() {
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8 pb-24">
       
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">Payroll Processing</h1>
@@ -93,8 +96,10 @@ export default function PayrollDashboard() {
         </button>
       </div>
 
+      {/* Main Table Container */}
       <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-[600px]">
         
+        {/* Controls Bar */}
         <div className="p-4 border-b border-neutral-100 bg-neutral-50/50 flex flex-col sm:flex-row gap-4 justify-between items-center">
           <div className="flex items-center gap-3">
             <select 
@@ -129,6 +134,7 @@ export default function PayrollDashboard() {
           </div>
         </div>
 
+        {/* Table Content */}
         <div className="flex-1 overflow-x-auto">
           {loading ? (
             <div className="h-full flex items-center justify-center py-20"><Loader2 className="animate-spin text-neutral-400" size={24}/></div>
@@ -193,7 +199,10 @@ export default function PayrollDashboard() {
                         {formatTk(ps.netPay)}
                       </td>
                       <td className="px-6 py-4 text-right">
-                        <button className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 text-neutral-600 hover:text-black hover:border-black transition-colors text-xs font-bold shadow-sm">
+                        <button 
+                          onClick={() => setSelectedPayslip(ps)}
+                          className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 text-neutral-600 hover:text-black hover:border-black transition-colors text-xs font-bold shadow-sm"
+                        >
                           <Download size={14} /> PDF
                         </button>
                       </td>
@@ -205,6 +214,125 @@ export default function PayrollDashboard() {
           )}
         </div>
       </div>
+
+      {/* Payslip PDF / Printable Modal */}
+      {selectedPayslip && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-150">
+            
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-neutral-100 flex justify-between items-center bg-neutral-50">
+              <div className="flex items-center gap-2">
+                <FileText className="text-black" size={20} />
+                <h3 className="font-bold text-neutral-900">Payslip Preview - {new Date(0, selectedPayslip.month - 1).toLocaleString('default', { month: 'long' })} {selectedPayslip.year}</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => window.print()} 
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-black text-white rounded-lg text-xs font-bold hover:bg-neutral-800 transition-colors"
+                >
+                  <Printer size={14} /> Print / Save PDF
+                </button>
+                <button 
+                  onClick={() => setSelectedPayslip(null)}
+                  className="p-1.5 text-neutral-400 hover:text-black rounded-lg hover:bg-neutral-200/60 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Printable Payslip Body */}
+            <div className="p-8 overflow-y-auto space-y-6 text-sm text-neutral-800">
+              <div className="flex justify-between items-start border-b border-neutral-200 pb-6">
+                <div>
+                  <h2 className="text-xl font-black text-neutral-900">FASHION ASIA LIMITED</h2>
+                  <p className="text-xs text-neutral-500 mt-0.5">Official Salary Statement & Payslip</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">Statement Period</p>
+                  <p className="font-semibold text-neutral-900">{selectedPayslip.month}/{selectedPayslip.year}</p>
+                </div>
+              </div>
+
+              {/* Employee Info */}
+              <div className="grid grid-cols-2 gap-4 bg-neutral-50 p-4 rounded-xl border border-neutral-100">
+                <div>
+                  <span className="text-xs text-neutral-400 block font-medium">Employee Name</span>
+                  <span className="font-bold text-neutral-900 text-base">{selectedPayslip.employee?.name}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-neutral-400 block font-medium">Employee ID / Code</span>
+                  <span className="font-mono font-semibold text-neutral-700">{selectedPayslip.employee?.employeeCode}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-neutral-400 block font-medium">Department / Position</span>
+                  <span className="font-semibold text-neutral-700">{selectedPayslip.employee?.department || 'N/A'} - {selectedPayslip.employee?.position || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="text-xs text-neutral-400 block font-medium">Payable Days</span>
+                  <span className="font-semibold text-neutral-700">{selectedPayslip.payableDays ?? 'Full Month'} / {selectedPayslip.standardWorkingDays ?? '30'} Days</span>
+                </div>
+              </div>
+
+              {/* Earnings & Deductions Tables */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Earnings */}
+                <div className="border border-neutral-200 rounded-xl overflow-hidden">
+                  <div className="bg-neutral-100 px-4 py-2.5 font-bold text-xs uppercase text-neutral-600 tracking-wider">Earnings</div>
+                  <div className="divide-y divide-neutral-100 p-4 space-y-2">
+                    <div className="flex justify-between"><span>Basic Salary</span> <span className="font-semibold">{formatTk(selectedPayslip.basicSalary)}</span></div>
+                    <div className="flex justify-between"><span>House Rent</span> <span className="font-semibold">{formatTk(selectedPayslip.houseRent)}</span></div>
+                    <div className="flex justify-between"><span>Medical Allowance</span> <span className="font-semibold">{formatTk(selectedPayslip.medicalAllowance)}</span></div>
+                    <div className="flex justify-between"><span>Transport Allowance</span> <span className="font-semibold">{formatTk(selectedPayslip.transportAllowance)}</span></div>
+                    <div className="flex justify-between"><span>Other Allowances</span> <span className="font-semibold">{formatTk(selectedPayslip.otherAllowances)}</span></div>
+                    <div className="flex justify-between pt-2 border-t border-neutral-200 font-bold text-neutral-900">
+                      <span>Gross Salary</span> <span>{formatTk(selectedPayslip.grossSalary)}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Deductions */}
+                <div className="border border-neutral-200 rounded-xl overflow-hidden">
+                  <div className="bg-neutral-100 px-4 py-2.5 font-bold text-xs uppercase text-neutral-600 tracking-wider">Deductions</div>
+                  <div className="divide-y divide-neutral-100 p-4 space-y-2">
+                    <div className="flex justify-between"><span>Transport Deduction</span> <span className="font-semibold text-red-600">-{formatTk(selectedPayslip.transportDeduction)}</span></div>
+                    <div className="flex justify-between"><span>Tax Deduction</span> <span className="font-semibold text-red-600">-{formatTk(selectedPayslip.taxDeduction)}</span></div>
+                    <div className="flex justify-between"><span>Company Loan EMI</span> <span className="font-semibold text-red-600">-{formatTk(selectedPayslip.loanDeduction)}</span></div>
+                    <div className="flex justify-between"><span>Advance Deduction</span> <span className="font-semibold text-red-600">-{formatTk(selectedPayslip.advanceDeduction)}</span></div>
+                    <div className="flex justify-between pt-2 border-t border-neutral-200 font-bold text-neutral-900">
+                      <span>Total Deductions</span> <span className="text-red-600">-{formatTk((selectedPayslip.transportDeduction || 0) + (selectedPayslip.taxDeduction || 0) + (selectedPayslip.loanDeduction || 0) + (selectedPayslip.advanceDeduction || 0))}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Net Pay Banner */}
+              <div className="bg-black text-white p-5 rounded-xl flex justify-between items-center shadow-md">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wider text-neutral-400">Net Take-Home Pay</p>
+                  <p className="text-2xl font-black">{formatTk(selectedPayslip.netPay)}</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-[10px] font-bold uppercase px-2.5 py-1 bg-neutral-800 rounded-full text-emerald-400">
+                    {selectedPayslip.status || 'GENERATED'}
+                  </span>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
+  );
+}
+
+export default function PayrollDashboard() {
+  return (
+    <Suspense fallback={<div className="p-10 flex justify-center"><Loader2 className="animate-spin" size={24} /></div>}>
+      <PayrollContent />
+    </Suspense>
   );
 }
