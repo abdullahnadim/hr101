@@ -250,15 +250,23 @@ model PayrollSettings {
   organization               Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   
   // Salary Breakdown Configuration
-  basicPercentage            Float        @default(50)  // 50% of Gross
-  houseRentPercentageOfBasic Float        @default(50)  // 50% of Basic
-  medicalAllowanceFixed      Float        @default(600) // Fixed 600tk
+  basicPercentage            Float        @default(50)  
+  houseRentPercentageOfBasic Float        @default(50)  
+  medicalAllowanceFixed      Float        @default(600) 
   
   // Salary Cycle Configuration
   salaryCycleStartDay        Int          @default(26)
   salaryCycleEndDay          Int          @default(25)
   weekends                   String[]     @default(["Friday", "Saturday"])
   
+  // NEW: Tax & Deduction Rules (Bangladesh FY 2026-27 Defaults)
+  taxFreeAmountMale          Float        @default(400000)
+  taxFreeAmountFemale        Float        @default(450000)
+  minimumTaxDhaka            Float        @default(5000)
+  minimumTaxOther            Float        @default(3000)
+  investmentRebatePercentage Float        @default(15)
+  allowableInvestmentCap     Float        @default(20) // Max 20% of taxable income
+
   updatedAt                  DateTime     @updatedAt
 }
 

@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { Save, Loader2, Calculator, CalendarDays, Clock, CheckSquare, Square } from 'lucide-react';
+import { Save, Loader2, Calculator, CalendarDays, Clock, CheckSquare, Square, FileText, Percent } from 'lucide-react';
 
 const DAYS_OF_WEEK = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
@@ -14,16 +14,29 @@ export default function PayrollSettingsPage() {
     medicalAllowanceFixed: 600,
     salaryCycleStartDay: 26,
     salaryCycleEndDay: 25,
-    weekends: ["Friday", "Saturday"]
+    weekends: ["Friday", "Saturday"],
+    taxFreeAmountMale: 400000,
+    taxFreeAmountFemale: 450000,
+    minimumTaxDhaka: 5000,
+    minimumTaxOther: 3000,
+    investmentRebatePercentage: 15,
+    allowableInvestmentCap: 20
   });
 
   useEffect(() => {
     fetch('/api/settings/payroll')
       .then(res => res.json())
       .then(data => {
-        if (!data.error) setSettings(data);
+        if (!data.error) {
+          // Safely merge DB data with our default state to prevent uncontrolled inputs
+          setSettings(prev => ({
+            ...prev,
+            ...Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== null && v !== undefined))
+          }));
+        }
         setLoading(false);
-      });
+      })
+      .catch(() => setLoading(false));
   }, []);
 
   const toggleWeekend = (day: string) => {
@@ -70,8 +83,8 @@ export default function PayrollSettingsPage() {
     <div className="p-6 md:p-10 max-w-4xl mx-auto space-y-8 pb-24">
       
       <div>
-        <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">Payroll & Calendar Rules</h1>
-        <p className="text-neutral-500 mt-1">Configure global salary breakdown formulas and monthly cycle dates.</p>
+        <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">Payroll & Rules</h1>
+        <p className="text-neutral-500 mt-1">Configure global salary breakdown formulas, tax rules, and monthly cycle dates.</p>
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
@@ -125,6 +138,85 @@ export default function PayrollSettingsPage() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* NEW: Tax Rules Block */}
+        <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-6 py-5 border-b border-neutral-100 bg-neutral-50/50 flex items-center gap-2.5">
+            <FileText size={18} className="text-red-600" />
+            <h2 className="font-bold text-neutral-900">Annual Tax & Investment Rules (FY 2026-27)</h2>
+          </div>
+          <div className="p-6 md:p-8 space-y-8">
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Tax-Free Limit (Men)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-3 text-neutral-400 font-bold">৳</span>
+                  <input 
+                    type="number" required
+                    value={settings.taxFreeAmountMale} 
+                    onChange={e => setSettings({...settings, taxFreeAmountMale: Number(e.target.value)})}
+                    className="w-full p-3 pl-8 border border-neutral-300 rounded-xl text-sm font-semibold outline-none focus:border-black transition-colors" 
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Tax-Free Limit (Women/65+)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-3 text-neutral-400 font-bold">৳</span>
+                  <input 
+                    type="number" required
+                    value={settings.taxFreeAmountFemale} 
+                    onChange={e => setSettings({...settings, taxFreeAmountFemale: Number(e.target.value)})}
+                    className="w-full p-3 pl-8 border border-neutral-300 rounded-xl text-sm font-semibold outline-none focus:border-black transition-colors" 
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-neutral-100 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Minimum Tax (Dhaka)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-3 text-neutral-400 font-bold">৳</span>
+                  <input 
+                    type="number" required
+                    value={settings.minimumTaxDhaka} 
+                    onChange={e => setSettings({...settings, minimumTaxDhaka: Number(e.target.value)})}
+                    className="w-full p-3 pl-8 border border-neutral-300 rounded-xl text-sm font-semibold outline-none focus:border-black transition-colors" 
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Max Investment Rebate %</label>
+                <div className="flex gap-2">
+                  <div className="relative w-full">
+                    <input 
+                      type="number" required
+                      value={settings.allowableInvestmentCap} 
+                      onChange={e => setSettings({...settings, allowableInvestmentCap: Number(e.target.value)})}
+                      className="w-full p-3 pr-8 border border-neutral-300 rounded-xl text-sm font-semibold outline-none focus:border-black transition-colors" 
+                      title="Max allowable investment as % of taxable income"
+                    />
+                    <span className="absolute right-3 top-3 text-neutral-400 font-bold">%</span>
+                  </div>
+                  <div className="flex items-center text-neutral-400 font-black px-2">X</div>
+                  <div className="relative w-full">
+                    <input 
+                      type="number" required
+                      value={settings.investmentRebatePercentage} 
+                      onChange={e => setSettings({...settings, investmentRebatePercentage: Number(e.target.value)})}
+                      className="w-full p-3 pr-8 border border-neutral-300 rounded-xl text-sm font-semibold outline-none focus:border-black transition-colors" 
+                      title="Rebate percentage on invested amount"
+                    />
+                    <span className="absolute right-3 top-3 text-neutral-400 font-bold">%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 

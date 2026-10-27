@@ -14,7 +14,7 @@ export default function CandidatesPage() {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   
-  // Track selected candidates for export
+  // Track selected candidates for export & scheduling
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   const fetchCandidates = () => {
@@ -34,7 +34,6 @@ export default function CandidatesPage() {
     setCandidates(prev => [newCandidate, ...prev]);
   };
 
-  // Get the full candidate objects based on selected IDs
   const selectedCandidates = candidates.filter(c => selectedIds.includes(c.id));
 
   return (
@@ -49,14 +48,12 @@ export default function CandidatesPage() {
         </div>
         
         <div className="flex flex-wrap gap-3 w-full md:w-auto">
-          {/* Export Button: Only visible when candidates are selected */}
           {selectedIds.length > 0 && (
             <button 
               onClick={() => setIsExportModalOpen(true)}
               className="flex-1 md:flex-none flex items-center justify-center gap-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-lg hover:bg-emerald-100 transition-colors shadow-sm"
             >
-              <Download size={16} />
-              Export ({selectedIds.length})
+              <Download size={16} /> Export ({selectedIds.length})
             </button>
           )}
 
@@ -66,7 +63,7 @@ export default function CandidatesPage() {
             onClick={() => setIsScheduleModalOpen(true)}
             className="flex-1 md:flex-none flex items-center justify-center gap-2 text-sm font-medium text-blue-600 bg-blue-50 px-4 py-2 rounded-lg hover:bg-blue-100 transition-colors shadow-sm"
           >
-            <CalendarIcon size={16} /> Schedule
+            <CalendarIcon size={16} /> {selectedIds.length > 0 ? `Schedule Selected (${selectedIds.length})` : 'Schedule'}
           </button>
 
           <button 
@@ -86,33 +83,29 @@ export default function CandidatesPage() {
             <CandidateTable 
               candidates={candidates} 
               refreshData={fetchCandidates} 
-              // Pass the selection state down to the table checkboxes
               selectedIds={selectedIds}
               onSelectionChange={setSelectedIds}
+              onOpenSchedule={() => setIsScheduleModalOpen(true)}
             />
           )}
         </div>
       </div>
 
       {/* Modals */}
-      <AddCandidateModal 
-        isOpen={isModalOpen} 
-        onClose={() => setIsModalOpen(false)} 
-        onSuccess={handleAddCandidate}
-      />
-
+      <AddCandidateModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSuccess={handleAddCandidate} />
+      
+      {/* Schedule Modal now accepts selected candidates explicitly if they exist */}
       <ScheduleModal 
         isOpen={isScheduleModalOpen}
         onClose={() => setIsScheduleModalOpen(false)}
-        candidates={candidates}
-        onSuccess={fetchCandidates}
+        candidates={selectedIds.length > 0 ? selectedCandidates : candidates}
+        onSuccess={() => {
+          fetchCandidates();
+          setSelectedIds([]); // Clear selection after scheduling
+        }}
       />
-
-      <ExportCandidatesModal 
-        isOpen={isExportModalOpen}
-        onClose={() => setIsExportModalOpen(false)}
-        selectedCandidates={selectedCandidates}
-      />
+      
+      <ExportCandidatesModal isOpen={isExportModalOpen} onClose={() => setIsExportModalOpen(false)} selectedCandidates={selectedCandidates} />
     </>
   );
 }

@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { 
   LayoutDashboard, Users, Calendar, Settings, CalendarClock, 
   Briefcase, Building, LogIn, LogOut, SlidersHorizontal, Monitor, 
-  Calculator, Menu, X
+  Calculator, Menu, X, UploadCloud
 } from "lucide-react";
 
 export function AppNavigation({ children }: { children: React.ReactNode }) {
@@ -44,6 +44,9 @@ export function AppNavigation({ children }: { children: React.ReactNode }) {
           <Link onClick={() => setMobileMenuOpen(false)} href="/recruitment" className={linkClass('/recruitment')}><LayoutDashboard size={18} /> ATS Dashboard</Link>
           <Link onClick={() => setMobileMenuOpen(false)} href="/recruitment/candidates" className={linkClass('/recruitment/candidates')}><Users size={18} /> Candidates</Link>
           <Link onClick={() => setMobileMenuOpen(false)} href="/recruitment/calendar" className={linkClass('/recruitment/calendar')}><Calendar size={18} /> Interviews</Link>
+          {(isAdmin || userRole === 'HR_MANAGER') && (
+            <Link onClick={() => setMobileMenuOpen(false)} href="/recruitment/settings" className={linkClass('/recruitment/settings')}><SlidersHorizontal size={18} /> ATS Settings</Link>
+          )}
         </div>
       )}
 
@@ -51,7 +54,14 @@ export function AppNavigation({ children }: { children: React.ReactNode }) {
         <div className="space-y-1">
           <div className="px-3 mb-2 text-xs font-bold text-neutral-400 uppercase tracking-wider">Internal Ops</div>
           {isHR && <Link onClick={() => setMobileMenuOpen(false)} href="/admin/employees" className={linkClass('/admin/employees')}><Briefcase size={18} /> Directory</Link>}
-          {(isAdmin || userRole === 'HR_MANAGER') && <Link onClick={() => setMobileMenuOpen(false)} href="/admin/payroll" className={linkClass('/admin/payroll')}><Calculator size={18} /> Payroll</Link>}
+          
+          {(isAdmin || userRole === 'HR_MANAGER') && (
+            <>
+              <Link onClick={() => setMobileMenuOpen(false)} href="/admin/payroll" className={linkClass('/admin/payroll')}><Calculator size={18} /> Payroll</Link>
+              <Link onClick={() => setMobileMenuOpen(false)} href="/admin/attendance/import" className={linkClass('/admin/attendance/import')}><UploadCloud size={18} /> Import Attendance</Link>
+            </>
+          )}
+          
           {isIT && <Link onClick={() => setMobileMenuOpen(false)} href="/admin/it" className={linkClass('/admin/it')}><Monitor size={18} /> IT Assets</Link>}
           {(isAdmin || userRole === 'HR_MANAGER' || userRole === 'IT_STAFF') && (
             <Link onClick={() => setMobileMenuOpen(false)} href="/admin/conference" className={linkClass('/admin/conference')}><CalendarClock size={18} /> Room Admin</Link>

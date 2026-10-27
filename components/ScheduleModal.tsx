@@ -2,11 +2,11 @@
 import { useState, useEffect } from 'react';
 import { X, Calendar as CalendarIcon, Clock, Loader2, Sparkles, Coffee, Link as LinkIcon, Filter, Building, Video } from 'lucide-react';
 import { useSession } from 'next-auth/react';
-import { useSettingsStore } from '@/store/useSettingsStore'; // NEW: Import store for WhatsApp template
+import { useSettingsStore } from '@/store/useSettingsStore'; 
 
 export default function ScheduleModal({ isOpen, onClose, candidates, onSuccess }: any) {
   const { data: session } = useSession();
-  const { whatsappTemplate } = useSettingsStore(); // Pull dynamic template
+  const { whatsappTemplate } = useSettingsStore(); 
   const [loading, setLoading] = useState(false);
   
   // Settings
@@ -21,7 +21,7 @@ export default function ScheduleModal({ isOpen, onClose, candidates, onSuccess }
   const [breakDuration, setBreakDuration] = useState('60');
 
   // Location Settings
-  const [locationType, setLocationType] = useState('VIRTUAL'); // 'VIRTUAL' or 'CONFERENCE_ROOM'
+  const [locationType, setLocationType] = useState('VIRTUAL'); 
   const [meetingLink, setMeetingLink] = useState('');
   
   // Room Timeline State
@@ -40,7 +40,15 @@ export default function ScheduleModal({ isOpen, onClose, candidates, onSuccess }
   // Fetch HR Staff & Initialize Candidates
   useEffect(() => {
     if (isOpen) {
-      const available = candidates.filter((c: any) => c.status === 'NEW' || c.status === 'RESCHEDULED');
+      // FIX: Include 'SCHEDULED' candidates so they can be Rescheduled. 
+      // Do not allow hired or rejected candidates to be scheduled.
+      const available = candidates.filter((c: any) => 
+        c.status === 'NEW' || 
+        c.status === 'RESCHEDULED' || 
+        c.status === 'SCHEDULED' || 
+        c.status === 'INTERVIEWED'
+      );
+      
       setScheduleData(available.map((c: any) => ({ ...c, selected: false, assignedTime: '' })));
       setDate(new Date().toISOString().split('T')[0]);
       setSelectAll(false);
@@ -114,7 +122,7 @@ export default function ScheduleModal({ isOpen, onClose, candidates, onSuccess }
     setScheduleData(prev => prev.map(c => c.id === id ? { ...c, assignedTime: time, selected: true } : c));
   };
 
-// --- WHATSAPP INVITE HELPER ---
+  // --- WHATSAPP INVITE HELPER ---
   const handleWhatsAppInvite = (candidate: any) => {
     if (!candidate.assignedTime || !date) {
       alert("Please assign a date and time slot first.");
@@ -127,7 +135,6 @@ export default function ScheduleModal({ isOpen, onClose, candidates, onSuccess }
       return;
     }
 
-    // Fix: Ensure Bangladesh country code is present for WhatsApp
     if (phone.startsWith('01') && phone.length === 11) {
       phone = `88${phone}`;
     }
@@ -135,7 +142,6 @@ export default function ScheduleModal({ isOpen, onClose, candidates, onSuccess }
     const formattedDate = formatDate(date);
     const formattedTime = formatTime(candidate.assignedTime);
 
-    // Apply variables to the dynamically loaded template from Zustand
     const message = (whatsappTemplate || `Hi {{candidate_name}}, your interview for {{position}} is on {{interview_date}} at {{interview_time}}. Please confirm.`)
       .replace(/\{\{candidate_name\}\}/g, candidate.name || '')
       .replace(/\{\{position\}\}/g, candidate.position || '')
@@ -143,7 +149,6 @@ export default function ScheduleModal({ isOpen, onClose, candidates, onSuccess }
       .replace(/\{\{interview_time\}\}/g, formattedTime)
       .replace(/\{\{interview_duration\}\}/g, duration);
 
-    // Append location details
     const locationText = locationType === 'VIRTUAL' 
       ? `\n📍 Location: Online via Google Meet: ${meetingLink || 'Link will be shared soon'}` 
       : `\n📍 Location: In-Person at our Office Conference Room`;
@@ -253,7 +258,7 @@ export default function ScheduleModal({ isOpen, onClose, candidates, onSuccess }
     }));
 
     try {
-      // 1. Save ATS Interviews
+      // 1. Save ATS Interviews (This backend route handles updating Candidate status to SCHEDULED/RESCHEDULED)
       const res = await fetch('/api/interviews', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -416,7 +421,7 @@ export default function ScheduleModal({ isOpen, onClose, candidates, onSuccess }
                     </div>
                   )}
 
-                  {/* Live Timeline Display (Standardized Format) */}
+                  {/* Live Timeline Display */}
                   <div className="bg-white border border-emerald-200 p-2 rounded text-xs">
                     <div className="flex justify-between items-center font-bold text-emerald-800 mb-2 border-b border-emerald-100 pb-1">
                       <span>Room Timeline ({date ? formatDate(date) : ''})</span>
@@ -475,7 +480,10 @@ export default function ScheduleModal({ isOpen, onClose, candidates, onSuccess }
                       <input type="checkbox" checked={c.selected} onChange={() => toggleCandidate(c.id)} className="w-4 h-4 rounded border-neutral-300 text-black focus:ring-black accent-black cursor-pointer" />
                       <div>
                         <div className="text-sm font-medium text-neutral-900">{c.name}</div>
-                        <div className="text-xs text-neutral-500">{c.position}</div>
+                        <div className="text-xs text-neutral-500 flex items-center gap-2">
+                           {c.position}
+                           {c.status === 'SCHEDULED' && <span className="text-[9px] font-bold text-blue-600 bg-blue-50 px-1 rounded uppercase">Already Scheduled</span>}
+                        </div>
                       </div>
                     </div>
                     
