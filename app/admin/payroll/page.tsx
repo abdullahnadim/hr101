@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, Suspense, Fragment } from 'react';
 import { 
   Calculator, Search, Loader2, DollarSign, 
   FileText, Download, TrendingUp, TrendingDown, X, Printer, TableProperties
@@ -16,7 +16,7 @@ function PayrollContent() {
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [selectedPayslip, setSelectedPayslip] = useState<any | null>(null); 
-  const [showMasterSheet, setShowMasterSheet] = useState(false); // Toggle for Jibika format
+  const [showMasterSheet, setShowMasterSheet] = useState(false);
   
   const currentDate = new Date();
   const [selectedMonth, setSelectedMonth] = useState(currentDate.getMonth() + 1);
@@ -66,13 +66,13 @@ function PayrollContent() {
     ps.employee?.employeeCode?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Group by department for the Master Sheet
-  const groupedByDept = filteredPayslips.reduce((acc, ps) => {
+  // Group by department - Explicitly typing for TS
+  const groupedByDept: Record<string, any[]> = filteredPayslips.reduce((acc: Record<string, any[]>, ps: any) => {
     const dept = ps.employee?.department || 'Unassigned';
     if (!acc[dept]) acc[dept] = [];
     acc[dept].push(ps);
     return acc;
-  }, {} as Record<string, any[]>);
+  }, {});
 
   // --- Jibika Master Sheet Renderer ---
   if (showMasterSheet) {
@@ -136,8 +136,8 @@ function PayrollContent() {
               </tr>
             </thead>
             <tbody>
-              {Object.entries(groupedByDept).map(([dept, slips]) => (
-                <React.Fragment key={dept}>
+              {(Object.entries(groupedByDept) as [string, any[]][]).map(([dept, slips]) => (
+                <Fragment key={dept}>
                   {/* Department Header Row */}
                   <tr>
                     <td colSpan={23} className="border border-neutral-800 p-1 font-bold bg-neutral-100 text-left underline">
@@ -145,8 +145,8 @@ function PayrollContent() {
                     </td>
                   </tr>
                   
-                  {slips.map((ps, index) => {
-                    const totalDed = (ps.advanceDeduction || 0) + (ps.taxDeduction || 0) + (ps.transportDeduction || 0) + (ps.loanDeduction || 0) + 10; // +10 for revenue stamp example
+                  {(slips as any[]).map((ps: any, index: number) => {
+                    const totalDed = (ps.advanceDeduction || 0) + (ps.taxDeduction || 0) + (ps.transportDeduction || 0) + (ps.loanDeduction || 0) + 10; 
                     const totalDays = ps.standardWorkingDays || 30;
                     
                     return (
@@ -210,7 +210,7 @@ function PayrollContent() {
                       </tr>
                     );
                   })}
-                </React.Fragment>
+                </Fragment>
               ))}
             </tbody>
           </table>
