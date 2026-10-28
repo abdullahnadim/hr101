@@ -29,7 +29,6 @@ export const authOptions: NextAuthOptions = {
         return {
           id: user.id,
           email: user.email,
-          role: user.role,
           orgId: user.orgId
         };
       }
@@ -38,15 +37,38 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.role = (user as any).role;
+        token.id = user.id;
         token.orgId = (user as any).orgId;
+        
+        // Fetch the user's role and all associated permissions from the DB
+        const dbUser = await prisma.user.findUnique({
+          where: { id: user.id },
+          include: {
+            role: {
+              include: { permissions: true }
+            }
+          }
+        });
+
+        // Map permissions into an array: e.g., ["ACCOUNTS:READ", "PAYROLL:UPDATE"]
+        if (dbUser?.role) {
+          token.roleName = dbUser.role.name;
+          token.permissions = dbUser.role.permissions.map(
+            (p) => `${p.module}:${p.action}`
+          );
+        } else {
+          token.roleName = null;
+          token.permissions = [];
+        }
       }
       return token;
     },
     async session({ session, token }) {
       if (token && session.user) {
-        (session.user as any).role = token.role;
+        (session.user as any).id = token.id;
         (session.user as any).orgId = token.orgId;
+        (session.user as any).roleName = token.roleName;
+        (session.user as any).permissions = (token.permissions as string[]) || [];
       }
       return session;
     }

@@ -1,67 +1,52 @@
 import { getToken } from "next-auth/jwt";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
-export default async function proxy(req: any) {
-  // 1. THE ULTIMATE MOCK: We create an object that perfectly mimics a NextRequest
-  // so NextAuth's internal destructurings cannot possibly fail.
-  const url = new URL(req.url);
-  
-  const mockedRequest = {
-    ...req,
-    url: req.url,
-    headers: req.headers,
-    cookies: req.cookies || {},
-    // Forcefully inject the exact object shape NextAuth demands
-    nextUrl: {
-      pathname: url.pathname,
-      search: url.search,
-      searchParams: url.searchParams,
-      href: url.href,
-    }
-  };
-
+export default async function proxy(req: NextRequest) {
   try {
-    // 2. Pass the bulletproof mock to NextAuth
-    const token = await getToken({ 
-      req: mockedRequest as any, 
-      secret: process.env.NEXTAUTH_SECRET 
-    });
-    
-    const path = url.pathname;
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET });
+    const path = req.nextUrl.pathname;
 
-    // 3. Routing Logic
-    if (!token && path.startsWith("/admin")) {
+    const routeGuards: Record<string, string> = {
+      "/admin/accounts": "ACCOUNTS:READ",
+      "/accounts":       "ACCOUNTS:READ",
+      "/admin/audit":    "AUDIT:READ",
+      "/audit":          "AUDIT:READ",
+      "/admin/payroll":  "PAYROLL:READ",
+      "/recruitment":    "RECRUITMENT:READ",
+      "/admin/it":       "IT_ASSETS:READ",
+      "/admin/settings": "SETTINGS:READ",
+      "/admin/employees":"HR_HUB:READ",
+      "/reception":      "RECEPTION:READ"
+    };
+
+    const isProtectedRoute = Object.keys(routeGuards).some(route => path.startsWith(route));
+
+    if (!token && (path.startsWith("/admin") || isProtectedRoute)) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
 
     if (token) {
-      const role = token.role as string;
-      
-      if (path.startsWith("/admin/employees") || path.startsWith("/admin/settings") || path.startsWith("/admin/payroll")) {
-        if (role !== "ADMIN" && role !== "HR_MANAGER") {
-          return NextResponse.redirect(new URL("/admin", req.url));
+      // THE ADMIN BYPASS
+      const roleName = token.roleName as string;
+      const isAdmin = roleName === 'ADMIN' || roleName === 'Super Admin';
+      const userPermissions = (token.permissions as string[]) || [];
+
+      // If they are not an Admin, strictly check their granular permissions
+      if (!isAdmin) {
+        for (const [protectedRoute, requiredPermission] of Object.entries(routeGuards)) {
+          if (path.startsWith(protectedRoute) && !userPermissions.includes(requiredPermission)) {
+            return NextResponse.redirect(new URL("/", req.url));
+          }
         }
-      }
-      
-      if (path.startsWith("/admin/it")) {
-        if (role !== "ADMIN" && role !== "IT_STAFF") {
-          return NextResponse.redirect(new URL("/admin", req.url));
-        }
-      }
-      
-      if (path.startsWith("/admin") && role === "EMPLOYEE") {
-        return NextResponse.redirect(new URL("/conference", req.url));
       }
     }
 
     return NextResponse.next();
   } catch (error) {
-    console.error("Critical Proxy Error:", error);
-    // If all else fails, allow the app to load rather than crashing the server with a 500 error
     return NextResponse.next(); 
   }
 }
 
 export const config = {
-  matcher: ["/admin/:path*"],
+  matcher: ["/admin/:path*", "/recruitment/:path*", "/accounts/:path*", "/audit/:path*", "/reception/:path*"],
 };

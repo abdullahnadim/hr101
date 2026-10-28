@@ -241,7 +241,7 @@ export default function ITDashboard() {
               <tbody className="divide-y divide-neutral-100">
                 {filteredAssets.map(asset => {
                   const Icon = getCategoryIcon(asset.category);
-                  const specs = asset.specs ? JSON.parse(asset.specs) : null;
+                  const specs = asset.specs ? (typeof asset.specs === 'string' ? JSON.parse(asset.specs) : asset.specs) : null;
                   
                   return (
                     <tr key={asset.id} className="hover:bg-neutral-50 transition-colors">

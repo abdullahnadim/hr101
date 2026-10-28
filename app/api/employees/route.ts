@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 export async function GET() {
   try {
     const employees = await prisma.employee.findMany({
+      include: { user: { include: { role: true } } }, // Fetch associated role
       orderBy: { createdAt: 'desc' }
     });
     return NextResponse.json(employees);
@@ -21,10 +23,10 @@ export async function POST(request: Request) {
     const org = await prisma.organization.findFirst();
     if (!org) throw new Error("Organization not found");
 
-    // Parse the JSON for the new employee record
     const rawDynamicData = body.customData || body.notes;
     const parsedCustomData = typeof rawDynamicData === 'string' ? JSON.parse(rawDynamicData) : rawDynamicData || null;
 
+    // 1. Create the Employee Record
     const newEmployee = await prisma.employee.create({
       data: {
         orgId: org.id,
@@ -36,11 +38,25 @@ export async function POST(request: Request) {
         department: body.department,
         status: body.status || 'ACTIVE',
         joiningDate: body.joiningDate || body.joinDate ? new Date(body.joiningDate || body.joinDate) : new Date(),
-        
-        // FIXED: Only customData is passed to Prisma now
         customData: parsedCustomData, 
       }
     });
+
+    // 2. If an email and Role ID were provided, create the User Login Account
+    if (body.email && body.roleId) {
+      const defaultPassword = 'Password123!'; // We set a default password
+      const hashedPassword = await bcrypt.hash(defaultPassword, 10);
+
+      await prisma.user.create({
+        data: {
+          email: body.email,
+          passwordHash: hashedPassword,
+          orgId: org.id,
+          employeeId: newEmployee.id,
+          roleId: body.roleId // Link the RBAC Role!
+        }
+      });
+    }
 
     return NextResponse.json(newEmployee);
   } catch (error) {

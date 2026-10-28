@@ -8,6 +8,49 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// --- NEW RBAC ENUMS ---
+enum AppModule {
+  HR_HUB
+  RECRUITMENT
+  PAYROLL
+  ACCOUNTS
+  AUDIT
+  RECEPTION
+  IT_ASSETS
+  SETTINGS
+}
+
+enum PermissionAction {
+  CREATE
+  READ
+  UPDATE
+  DELETE
+}
+
+// --- NEW RBAC MODELS ---
+model Role {
+  id          String           @id @default(cuid())
+  name        String           @unique 
+  description String?
+  permissions RolePermission[]
+  users       User[]           
+  
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model RolePermission {
+  id       String           @id @default(cuid())
+  roleId   String
+  role     Role             @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  
+  module   AppModule
+  action   PermissionAction
+  
+  @@unique([roleId, module, action]) 
+}
+
+// --- CORE MODELS ---
 model Organization {
   id              String            @id @default(uuid())
   name            String
@@ -23,23 +66,20 @@ model Organization {
 }
 
 model User {
-  id            String       @id @default(uuid())
-  email         String       @unique
+  id            String    @id @default(uuid())
+  email         String    @unique
   passwordHash  String
-  role          Role         @default(HR_STAFF)
+  
+  // UPDATED: Now links to the new Role table instead of the static Enum
+  roleId        String?
+  role          Role?     @relation(fields: [roleId], references: [id])
+  
   orgId         String
   organization  Organization @relation(fields: [orgId], references: [id])
   auditLogs     AuditLog[]
   
   employeeId    String?      @unique
   employee      Employee?    @relation(fields: [employeeId], references: [id])
-}
-
-enum Role {
-  ADMIN
-  HR_MANAGER
-  HR_STAFF
-  IT_STAFF
 }
 
 model Candidate {
@@ -71,56 +111,56 @@ model Candidate {
 }
 
 model Employee {
-  id                   String         @id @default(uuid())
-  orgId                String
-  organization         Organization   @relation(fields: [orgId], references: [id])
+  id                  String         @id @default(uuid())
+  orgId               String
+  organization        Organization   @relation(fields: [orgId], references: [id])
   
-  employeeCode         String         @unique 
-  name                 String
-  email                String?        @unique
-  phone                String
-  position             String
-  department           String
-  customData           Json?
-  joiningDate          DateTime
-  status               String         @default("ACTIVE") 
+  employeeCode        String         @unique 
+  name                String
+  email               String?        @unique
+  phone               String
+  position            String
+  department          String
+  customData          Json?
+  joiningDate         DateTime
+  status              String         @default("ACTIVE") 
 
   // --- PAYROLL & TRANSPORT FIELDS ---
-  baseSalary           Float          @default(0)
+  baseSalary          Float          @default(0)
   usesCompanyTransport Boolean        @default(false)
   transportRouteFare   Float          @default(0)
   mobileBillLimit      Float          @default(0)
 
-  increment            Float          @default(0)
-  taxPercentage        Float          @default(0)
-  taxAmount            Float          @default(0)
-  allowance            Float          @default(0)
-  transportAllowance   Float          @default(0)
+  increment           Float          @default(0)
+  taxPercentage       Float          @default(0)
+  taxAmount           Float          @default(0)
+  allowance           Float          @default(0)
+  transportAllowance  Float          @default(0)
   
-  leaveRequests        LeaveRequest[]
-  roomBookings         RoomBooking[]
-  itAssets             ITAsset[]
-  payrolls             Payroll[]
-  loans                Loan[]
-  attendances          Attendance[]
+  leaveRequests       LeaveRequest[]
+  roomBookings        RoomBooking[]
+  itAssets            ITAsset[]
+  payrolls            Payroll[]
+  loans               Loan[]
+  attendances         Attendance[]
   
-  user                 User?
+  user                User?
   
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 }
 
 model Room {
-  id          String        @id @default(cuid())
-  orgId       String
-  name        String
-  capacity    Int
-  amenities   Json?
-  status      String        @default("ACTIVE")
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id        String        @id @default(cuid())
+  orgId     String
+  name      String
+  capacity  Int
+  amenities Json?
+  status    String        @default("ACTIVE")
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
 
-  bookings    RoomBooking[]
+  bookings  RoomBooking[]
 }
 
 model RoomBooking {
@@ -180,13 +220,13 @@ model MessageLog {
 }
 
 model AuditLog {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  action      String
-  entity      String   
-  entityId    String
-  timestamp   DateTime @default(now())
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  entity    String   
+  entityId  String
+  timestamp DateTime @default(now())
 }
 
 // --- LEAVE MANAGEMENT ---
@@ -222,24 +262,24 @@ model LeaveRequest {
 // --- IT ASSET MANAGEMENT ---
 
 model ITAsset {
-  id            String    @id @default(cuid())
-  orgId         String
-  name          String    
-  category      String    
-  serialNumber  String?   
-  condition     String    @default("GOOD")      
-  status        String    @default("AVAILABLE") 
-  location      String?   
-  ipAddress     String?   
-  specs         Json?     
-  credentials   String?   // <--- Add this missing field to match your API route
+  id           String    @id @default(cuid())
+  orgId        String
+  name         String    
+  category     String    
+  serialNumber String?   
+  condition    String    @default("GOOD")      
+  status       String    @default("AVAILABLE") 
+  location     String?   
+  ipAddress    String?   
+  specs        Json?     
+  credentials  String?   
 
-  assignedToId  String?
-  assignedTo    Employee? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
-  notes         String?
+  assignedToId String?
+  assignedTo   Employee? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  notes        String?
   
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }
 
 // --- GLOBAL PAYROLL SETTINGS & CALENDAR ---
@@ -249,40 +289,37 @@ model PayrollSettings {
   orgId                      String       @unique
   organization               Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   
-  // Salary Breakdown Configuration
   basicPercentage            Float        @default(50)  
   houseRentPercentageOfBasic Float        @default(50)  
   medicalAllowanceFixed      Float        @default(600) 
   
-  // Salary Cycle Configuration
   salaryCycleStartDay        Int          @default(26)
   salaryCycleEndDay          Int          @default(25)
   weekends                   String[]     @default(["Friday", "Saturday"])
   
-  // NEW: Tax & Deduction Rules (Bangladesh FY 2026-27 Defaults)
   taxFreeAmountMale          Float        @default(400000)
   taxFreeAmountFemale        Float        @default(450000)
   minimumTaxDhaka            Float        @default(5000)
   minimumTaxOther            Float        @default(3000)
   investmentRebatePercentage Float        @default(15)
-  allowableInvestmentCap     Float        @default(20) // Max 20% of taxable income
+  allowableInvestmentCap     Float        @default(20) 
 
   updatedAt                  DateTime     @updatedAt
 }
 
 model Holiday {
-  id          String   @id @default(cuid())
-  date        DateTime @unique @db.Date
-  name        String
+  id        String   @id @default(cuid())
+  date      DateTime @unique @db.Date
+  name      String
 }
 
 model Attendance {
-  id          String   @id @default(cuid())
-  employeeId  String
-  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  employeeId String
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   
-  date        DateTime @db.Date
-  status      String   // "PRESENT", "ABSENT_UNPAID", "WEEKEND_WORK", "PAID_LEAVE"
+  date       DateTime @db.Date
+  status     String   
   
   @@unique([employeeId, date])
 }
@@ -290,19 +327,19 @@ model Attendance {
 // --- LOANS & ADVANCES ---
 
 model Loan {
-  id                 String       @id @default(cuid())
-  employeeId         String
-  employee           Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  id               String       @id @default(cuid())
+  employeeId       String
+  employee         Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   
-  type               String       @default("COMPANY_LOAN") // COMPANY_LOAN, PRIME_AGRIM_ADVANCE
-  totalAmount        Float
-  emiAmount          Float        
-  remainingBalance   Float
+  type             String       @default("COMPANY_LOAN") 
+  totalAmount      Float
+  emiAmount        Float        
+  remainingBalance Float
   
-  status             String       @default("ACTIVE") // ACTIVE, COMPLETED, CANCELLED
+  status           String       @default("ACTIVE") 
   
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
 }
 
 // --- MONTHLY PAYSLIPS ---
@@ -336,7 +373,7 @@ model Payroll {
   
   netPay              Float    
   
-  status              String   @default("DRAFT") // DRAFT, APPROVED, PAID
+  status              String   @default("DRAFT") 
   paymentDate         DateTime?
   
   createdAt           DateTime @default(now())

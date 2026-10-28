@@ -4,7 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
   ArrowLeft, User, Mail, Phone, Briefcase, Calendar, 
-  Activity, Hash, Loader2, FileText, ChevronRight, 
+  Hash, Loader2, FileText, ChevronRight, 
   Edit, CheckCircle2, Clock, Monitor, Laptop, 
   Calendar as CalendarIcon, Wallet, Bus, Shield, MapPin, Calculator, TrendingUp
 } from 'lucide-react';
@@ -157,7 +157,8 @@ export default function EmployeeProfilePage() {
               <div className="font-medium text-neutral-900 flex items-center gap-2">
                 {employee.user ? (
                   <span className="flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-lg text-sm font-bold border border-emerald-100">
-                    <CheckCircle2 size={16} /> {employee.user.role.replace('_', ' ')}
+                    {/* UPDATED: Dynamic RBAC Role Read */}
+                    <CheckCircle2 size={16} /> {employee.user.role?.name || 'Assigned'}
                   </span>
                 ) : (
                   <span className="flex items-center gap-2 bg-neutral-50 text-neutral-500 px-3 py-1.5 rounded-lg text-sm font-medium border border-neutral-200">
@@ -204,7 +205,7 @@ export default function EmployeeProfilePage() {
                 </div>
               )}
 
-              {/* Compensation Tab (UPDATED) */}
+              {/* Compensation Tab */}
               {activeTab === 'compensation' && (
                 <div className="animate-in fade-in duration-300">
                   <div className="flex items-center justify-between mb-6">
@@ -214,7 +215,6 @@ export default function EmployeeProfilePage() {
                     </Link>
                   </div>
                   
-                  {/* Primary Salary Block */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-6">
                     <div className="bg-neutral-50 p-5 rounded-xl border border-neutral-100">
                       <p className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Gross Base Salary</p>
@@ -237,7 +237,6 @@ export default function EmployeeProfilePage() {
                     </div>
                   </div>
 
-                  {/* Allowances Block */}
                   <h4 className="text-xs font-bold text-neutral-900 uppercase tracking-wider mb-3">Allowances & Limits</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <div className="p-4 border border-neutral-100 rounded-xl bg-white shadow-sm">
@@ -254,7 +253,6 @@ export default function EmployeeProfilePage() {
                     </div>
                   </div>
 
-                  {/* Logistics Block */}
                   <div className="bg-neutral-50 p-5 rounded-xl border border-neutral-100">
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-xs font-bold text-neutral-500 uppercase tracking-wider flex items-center gap-1.5"><Bus size={14}/> Transport Logistics</p>
@@ -331,7 +329,7 @@ export default function EmployeeProfilePage() {
                             <MapPin size={14} className="text-neutral-400" /> {booking.roomName}
                           </p>
                           <p className="text-xs text-neutral-500 mt-1 ml-5">
-                            {new Date(booking.date).toLocaleDateString('en-GB', { weekday: 'short', month: 'short', day: 'numeric'})} • {booking.startTime} ({booking.durationMinutes} mins)
+                            {new Date(booking.date).toLocaleDateString('en-GB', { weekday: 'short', month: 'short', day: 'numeric'})} - {booking.startTime} ({booking.durationMinutes} mins)
                           </p>
                         </div>
                         <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${

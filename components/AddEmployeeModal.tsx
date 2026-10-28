@@ -8,16 +8,30 @@ export default function AddEmployeeModal({ isOpen, onClose, onSuccess }: any) {
   const [mounted, setMounted] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   
+  // NEW: State to hold fetched roles
+  const [availableRoles, setAvailableRoles] = useState<any[]>([]);
+  
   const { positions, departments, employmentTypes, employeeFields } = useSettingsStore();
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    setMounted(true);
+    if (isOpen) {
+      // Fetch dynamic roles when modal opens
+      fetch('/api/roles')
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data)) setAvailableRoles(data);
+        })
+        .catch(err => console.error("Failed to load roles", err));
+    }
+  }, [isOpen]);
   
   if (!isOpen || !mounted) return null;
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 1024 * 1024) { // 1MB limit for Base64 storage
+      if (file.size > 1024 * 1024) { 
         alert("Image is too large. Please select an image under 1MB.");
         return;
       }
@@ -43,7 +57,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onSuccess }: any) {
       extractedDynamicFields.push({ key: 'Employment Type', value: data.employmentType as string });
     }
     
-    // NEW: Save the Base64 Image and Job ID into our dynamic JSON payload
     if (imagePreview) {
       extractedDynamicFields.push({ key: 'Profile Image', value: imagePreview });
     }
@@ -59,6 +72,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSuccess }: any) {
       department: data.department,
       status: data.status || 'ACTIVE',
       joinDate: data.joinDate,
+      roleId: data.roleId || null, // NEW: Include Role ID in payload
       customData: extractedDynamicFields.length > 0 ? JSON.stringify(extractedDynamicFields) : null
     };
 
@@ -71,7 +85,7 @@ export default function AddEmployeeModal({ isOpen, onClose, onSuccess }: any) {
     if (res.ok) {
       const newEmployee = await res.json();
       if (onSuccess) onSuccess(newEmployee);
-      setImagePreview(null); // reset
+      setImagePreview(null); 
       onClose();
     } else {
       alert("Failed to add employee.");
@@ -94,7 +108,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onSuccess }: any) {
         
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6">
           
-          {/* NEW: Profile Avatar & Job ID Row */}
           <div className="flex items-center gap-5 bg-neutral-50 p-4 rounded-xl border border-neutral-100">
             <div className="relative group flex-shrink-0">
               <div className="w-20 h-20 bg-white border-2 border-dashed border-neutral-300 text-neutral-400 rounded-full flex items-center justify-center overflow-hidden shadow-sm group-hover:border-blue-400 transition-colors">
@@ -116,7 +129,6 @@ export default function AddEmployeeModal({ isOpen, onClose, onSuccess }: any) {
             </div>
           </div>
 
-          {/* Base Fields */}
           <div className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Full Name *</label>
@@ -163,9 +175,20 @@ export default function AddEmployeeModal({ isOpen, onClose, onSuccess }: any) {
                 <input required name="joinDate" type="date" className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" />
               </div>
             </div>
+            
+            {/* NEW: System Role Assignment */}
+            <div className="p-4 border border-blue-100 bg-blue-50/50 rounded-xl">
+              <label className="block text-xs font-bold text-blue-800 uppercase tracking-wider mb-1.5">System Access Role</label>
+              <select name="roleId" className="w-full px-3 py-2.5 border border-blue-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 text-sm bg-white text-neutral-900">
+                <option value="">No System Access (Employee Hub Only)</option>
+                {availableRoles.map(role => (
+                  <option key={role.id} value={role.id}>{role.name}</option>
+                ))}
+              </select>
+              <p className="text-[10px] text-neutral-500 mt-1.5">Assigning a role generates a login account with default password `Password123!`</p>
+            </div>
           </div>
 
-          {/* Dynamically Rendered Employee Custom Fields */}
           {employeeFields?.length > 0 && (
             <div className="pt-5 border-t border-neutral-100 space-y-4">
               <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-2">Additional Details (Dynamic)</h3>

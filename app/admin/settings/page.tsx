@@ -1,50 +1,25 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   Save, Check, Loader2, Building, Clock, Globe, Bell, 
-  Calendar, Shield, DoorOpen, Users, Plus, Trash2, 
-  Lock, ShieldCheck, UserCog, KeyRound, UserPlus, CheckCircle2
+  Calendar, DoorOpen, Plus, Trash2, 
+  KeyRound, UserPlus, CheckCircle2, ShieldCheck, ArrowRight
 } from 'lucide-react';
 import { useSettingsStore } from '@/store/useSettingsStore';
-import ProvisionUserModal from '../../../components/ProvisionUserModal';
+import ProvisionUserModal from '@/components/ProvisionUserModal'; // Fixed path to use Next.js absolute alias
 
 const tabs = [
   { id: 'general', label: 'General & Company', icon: Building },
   { id: 'rooms', label: 'Rooms & Spaces', icon: DoorOpen },
   { id: 'users', label: 'System Access', icon: KeyRound },
-  { id: 'permissions', label: 'Roles & Access', icon: Shield },
+  { id: 'permissions', label: 'Roles & Access', icon: ShieldCheck }, // Note: We will handle this as a redirect now
   { id: 'leave', label: 'Leave Policies', icon: Calendar },
   { id: 'notifications', label: 'Notifications', icon: Bell },
 ];
 
-const SYSTEM_ROLES = [
-  { id: 'ADMIN', name: 'Administrator', description: 'Full unrestricted access to all platform features and billing.', color: 'text-purple-600', bg: 'bg-purple-50' },
-  { id: 'HR_MANAGER', name: 'HR Manager', description: 'Can manage employees, approve requests, and edit policies.', color: 'text-blue-600', bg: 'bg-blue-50' },
-  { id: 'HR_STAFF', name: 'HR Staff', description: 'Can view directories and manage standard daily operations.', color: 'text-emerald-600', bg: 'bg-emerald-50' },
-  { id: 'IT_STAFF', name: 'IT Staff', description: 'Can manage hardware inventory and conference rooms.', color: 'text-indigo-600', bg: 'bg-indigo-50' },
-  { id: 'EMPLOYEE', name: 'Standard Employee', description: 'Can view own profile, book rooms, and request leave.', color: 'text-neutral-600', bg: 'bg-neutral-100' }
-];
-
-const PERMISSION_MODULES = [
-  {
-    category: 'Employee Directory',
-    actions: [
-      { id: 'dir_view', label: 'View Directory', description: 'Can see the list of all employees.' },
-      { id: 'dir_edit', label: 'Manage Employees', description: 'Can add, edit, or terminate employee profiles.' },
-      { id: 'dir_salary', label: 'View Compensation', description: 'Can see salary, equity, and banking details.' }
-    ]
-  },
-  {
-    category: 'Workspace & Conference',
-    actions: [
-      { id: 'room_book', label: 'Book Rooms', description: 'Can request to book conference rooms.' },
-      { id: 'room_approve', label: 'Approve Bookings', description: 'Can approve or reject incoming room requests.' },
-      { id: 'room_manage', label: 'Manage Workspaces', description: 'Can add, edit, or delete physical rooms.' }
-    ]
-  }
-];
-
 export default function GeneralSettingsPage() {
+  const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
@@ -63,15 +38,6 @@ export default function GeneralSettingsPage() {
   const [roomSaving, setRoomSaving] = useState(false);
   const [newRoom, setNewRoom] = useState({ name: '', capacity: '', amenities: [] as string[] });
 
-  // Permissions State
-  const [selectedRole, setSelectedRole] = useState('HR_MANAGER');
-  const [rolePermissions, setRolePermissions] = useState<Record<string, Record<string, boolean>>>({
-    ADMIN: { dir_view: true, dir_edit: true, dir_salary: true, room_book: true, room_approve: true, room_manage: true },
-    HR_MANAGER: { dir_view: true, dir_edit: true, dir_salary: false, room_book: true, room_approve: true, room_manage: false },
-    HR_STAFF: { dir_view: true, dir_edit: false, dir_salary: false, room_book: true, room_approve: false, room_manage: false },
-    EMPLOYEE: { dir_view: true, dir_edit: false, dir_salary: false, room_book: true, room_approve: false, room_manage: false }
-  });
-
   // Leave Policies State
   const [leavePolicies, setLeavePolicies] = useState<any[]>([]);
   const [loadingPolicies, setLoadingPolicies] = useState(true);
@@ -89,7 +55,7 @@ export default function GeneralSettingsPage() {
       const [roomsRes, policiesRes, usersRes, empRes] = await Promise.all([
         fetch('/api/rooms'),
         fetch('/api/leave-policies'),
-        fetch('/api/users'),
+        fetch('/api/users'), // Note: Ensure you have an API route to fetch provisioned users
         fetch('/api/employees')
       ]);
       if (roomsRes.ok) setRooms(await roomsRes.json());
@@ -159,11 +125,6 @@ export default function GeneralSettingsPage() {
     setNewRoom(prev => ({
       ...prev, amenities: prev.amenities.includes(amenity) ? prev.amenities.filter(a => a !== amenity) : [...prev.amenities, amenity]
     }));
-  };
-
-  const togglePermission = (roleId: string, actionId: string) => {
-    if (roleId === 'ADMIN') return; 
-    setRolePermissions(prev => ({ ...prev, [roleId]: { ...prev[roleId], [actionId]: !prev[roleId][actionId] } }));
   };
 
   const handleAddPolicy = async (e: React.FormEvent) => {
@@ -375,7 +336,7 @@ export default function GeneralSettingsPage() {
                             <h3 className="font-bold text-neutral-900 text-base">{room.name}</h3>
                             <div className="flex items-center gap-4 mt-2">
                               <span className="flex items-center gap-1.5 text-xs font-medium text-neutral-600 bg-neutral-100 px-2 py-1 rounded-md w-fit">
-                                <Users size={14} /> {room.capacity} People
+                                <DoorOpen size={14} /> {room.capacity} People
                               </span>
                               <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${room.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                                 {room.status}
@@ -450,10 +411,10 @@ export default function GeneralSettingsPage() {
                             </td>
                             <td className="px-6 py-4">
                               <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                                user.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' :
-                                user.role === 'IT_STAFF' ? 'bg-blue-100 text-blue-700' : 'bg-neutral-100 text-neutral-700'
+                                user.role?.name === 'ADMIN' ? 'bg-purple-100 text-purple-700' :
+                                user.role?.name ? 'bg-blue-100 text-blue-700' : 'bg-neutral-100 text-neutral-700'
                               }`}>
-                                {user.role.replace('_', ' ')}
+                                {user.role?.name ? user.role.name.replace('_', ' ') : 'No Role'}
                               </span>
                             </td>
                             <td className="px-6 py-4 text-right">
@@ -579,88 +540,22 @@ export default function GeneralSettingsPage() {
             </>
           )}
 
-          {/* --- ROLES & PERMISSIONS TAB --- */}
+          {/* --- NEW: ROLES & PERMISSIONS TAB REDIRECT --- */}
           {activeTab === 'permissions' && (
-            <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden flex flex-col lg:flex-row min-h-[600px]">
-              <div className="w-full lg:w-72 border-r border-neutral-100 bg-neutral-50/50 flex flex-col">
-                <div className="px-5 py-4 border-b border-neutral-100">
-                  <h2 className="font-bold text-neutral-900 flex items-center gap-2"><UserCog size={18} className="text-blue-600"/> System Roles</h2>
-                  <p className="text-xs text-neutral-500 mt-1">Select a role to configure its access.</p>
-                </div>
-                <div className="flex-1 p-3 space-y-2">
-                  {SYSTEM_ROLES.map(role => (
-                    <button
-                      key={role.id}
-                      onClick={() => setSelectedRole(role.id)}
-                      className={`w-full text-left p-3 rounded-xl border transition-all ${
-                        selectedRole === role.id 
-                        ? 'bg-white border-blue-200 shadow-sm ring-1 ring-blue-100' 
-                        : 'bg-transparent border-transparent hover:bg-neutral-100'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2.5 mb-1">
-                        <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${role.bg} ${role.color}`}>
-                          {role.id === 'ADMIN' ? <ShieldCheck size={14}/> : <Users size={14}/>}
-                        </div>
-                        <span className={`text-sm font-bold ${selectedRole === role.id ? 'text-blue-700' : 'text-neutral-700'}`}>
-                          {role.name}
-                        </span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
+            <div className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden h-[400px] flex flex-col items-center justify-center text-center p-8">
+              <div className="w-16 h-16 bg-blue-50 border border-blue-100 rounded-full flex items-center justify-center mb-4 shadow-inner">
+                <ShieldCheck size={28} className="text-blue-600" />
               </div>
-
-              <div className="flex-1 flex flex-col">
-                {(() => {
-                  const roleDef = SYSTEM_ROLES.find(r => r.id === selectedRole);
-                  const isLocked = selectedRole === 'ADMIN';
-                  
-                  return (
-                    <>
-                      <div className="px-8 py-6 border-b border-neutral-100 bg-white">
-                        <h2 className="text-xl font-bold text-neutral-900">{roleDef?.name} Permissions</h2>
-                        <p className="text-sm text-neutral-500 mt-1">{roleDef?.description}</p>
-                        {isLocked && (
-                          <div className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 bg-neutral-100 text-neutral-600 rounded-lg text-xs font-bold border border-neutral-200">
-                            <Lock size={14} /> Administrator permissions cannot be modified.
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex-1 p-8 overflow-y-auto space-y-8 bg-white">
-                        {PERMISSION_MODULES.map((module, idx) => (
-                          <div key={idx}>
-                            <h3 className="text-sm font-bold text-neutral-900 border-b border-neutral-100 pb-2 mb-4 uppercase tracking-wider">
-                              {module.category}
-                            </h3>
-                            <div className="space-y-4">
-                              {module.actions.map(action => {
-                                const isGranted = rolePermissions[selectedRole]?.[action.id] || false;
-                                return (
-                                  <div key={action.id} className="flex items-start justify-between gap-4 p-4 rounded-xl border border-neutral-100 hover:border-neutral-200 transition-colors">
-                                    <div>
-                                      <h4 className="text-sm font-bold text-neutral-900">{action.label}</h4>
-                                      <p className="text-xs text-neutral-500 mt-0.5">{action.description}</p>
-                                    </div>
-                                    <button 
-                                      onClick={() => togglePermission(selectedRole, action.id)}
-                                      disabled={isLocked}
-                                      className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isGranted ? 'bg-blue-600' : 'bg-neutral-200'} ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                    >
-                                      <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isGranted ? 'translate-x-5' : 'translate-x-0'}`} />
-                                    </button>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
+              <h3 className="text-lg font-bold text-neutral-900">Advanced RBAC Management</h3>
+              <p className="text-sm text-neutral-500 mt-2 max-w-sm mb-6">
+                Role management has been moved to a dedicated, highly secure control panel for granular module permissions.
+              </p>
+              <button 
+                onClick={() => router.push('/admin/settings/roles')}
+                className="flex items-center gap-2 px-6 py-3 bg-black text-white font-bold text-sm rounded-lg hover:bg-neutral-800 transition-colors shadow-md"
+              >
+                Go to RBAC Control Panel <ArrowRight size={16} />
+              </button>
             </div>
           )}
 
@@ -679,15 +574,17 @@ export default function GeneralSettingsPage() {
       </div>
       
       {/* --- PROVISIONING MODAL --- */}
-      <ProvisionUserModal 
-        isOpen={isProvisionModalOpen} 
-        onClose={() => setIsProvisionModalOpen(false)} 
-        onSuccess={(newUser: any) => {
-          setUsers([newUser, ...users]);
-          setIsProvisionModalOpen(false);
-        }} 
-        employees={unprovisionedEmployees} 
-      />
+      {isProvisionModalOpen && (
+        <ProvisionUserModal 
+          isOpen={isProvisionModalOpen} 
+          onClose={() => setIsProvisionModalOpen(false)} 
+          onSuccess={(newUser: any) => {
+            setUsers([newUser, ...users]);
+            setIsProvisionModalOpen(false);
+          }} 
+          employees={unprovisionedEmployees} 
+        />
+      )}
 
     </div>
   );
