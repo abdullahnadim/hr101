@@ -7,13 +7,14 @@ import {
   KeyRound, UserPlus, CheckCircle2, ShieldCheck, ArrowRight
 } from 'lucide-react';
 import { useSettingsStore } from '@/store/useSettingsStore';
-import ProvisionUserModal from '@/components/ProvisionUserModal'; // Fixed path to use Next.js absolute alias
+import ProvisionUserModal from '@/components/ProvisionUserModal';
+import EditUserModal from '@/components/EditUserModal';
 
 const tabs = [
   { id: 'general', label: 'General & Company', icon: Building },
   { id: 'rooms', label: 'Rooms & Spaces', icon: DoorOpen },
   { id: 'users', label: 'System Access', icon: KeyRound },
-  { id: 'permissions', label: 'Roles & Access', icon: ShieldCheck }, // Note: We will handle this as a redirect now
+  { id: 'permissions', label: 'Roles & Access', icon: ShieldCheck }, 
   { id: 'leave', label: 'Leave Policies', icon: Calendar },
   { id: 'notifications', label: 'Notifications', icon: Bell },
 ];
@@ -49,13 +50,14 @@ export default function GeneralSettingsPage() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [isProvisionModalOpen, setIsProvisionModalOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<any>(null); // NEW: State for editing roles
 
   const fetchData = useCallback(async () => {
     try {
       const [roomsRes, policiesRes, usersRes, empRes] = await Promise.all([
         fetch('/api/rooms'),
         fetch('/api/leave-policies'),
-        fetch('/api/users'), // Note: Ensure you have an API route to fetch provisioned users
+        fetch('/api/users'), 
         fetch('/api/employees')
       ]);
       if (roomsRes.ok) setRooms(await roomsRes.json());
@@ -167,7 +169,12 @@ export default function GeneralSettingsPage() {
     if (!confirm("Are you sure you want to permanently revoke this user's system access? Their HR profile will remain intact.")) return;
     try {
       const res = await fetch(`/api/users/${id}`, { method: 'DELETE' });
-      if (res.ok) setUsers(users.filter(u => u.id !== id));
+      if (res.ok) {
+        setUsers(users.filter(u => u.id !== id));
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to revoke access');
+      }
     } catch (error) { alert('Failed to revoke access'); }
   };
 
@@ -392,7 +399,7 @@ export default function GeneralSettingsPage() {
                         <tr>
                           <th className="px-6 py-4">Account Holder</th>
                           <th className="px-6 py-4">Assigned Role</th>
-                          <th className="px-6 py-4 text-right">Access</th>
+                          <th className="px-6 py-4 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-neutral-100">
@@ -411,16 +418,24 @@ export default function GeneralSettingsPage() {
                             </td>
                             <td className="px-6 py-4">
                               <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                                user.role?.name === 'ADMIN' ? 'bg-purple-100 text-purple-700' :
+                                user.role?.name === 'ADMIN' || user.role?.name === 'Super Admin' ? 'bg-purple-100 text-purple-700' :
                                 user.role?.name ? 'bg-blue-100 text-blue-700' : 'bg-neutral-100 text-neutral-700'
                               }`}>
                                 {user.role?.name ? user.role.name.replace('_', ' ') : 'No Role'}
                               </span>
                             </td>
                             <td className="px-6 py-4 text-right">
-                              <button onClick={() => handleRevokeAccess(user.id)} className="text-xs font-bold text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-red-100 transition-colors">
-                                Revoke
-                              </button>
+                              <div className="flex justify-end gap-2">
+                                <button 
+                                  onClick={() => setUserToEdit(user)}
+                                  className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-blue-100 transition-colors"
+                                >
+                                  Edit Access
+                                </button>
+                                <button onClick={() => handleRevokeAccess(user.id)} className="text-xs font-bold text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-red-100 transition-colors">
+                                  Revoke
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))}
@@ -540,7 +555,7 @@ export default function GeneralSettingsPage() {
             </>
           )}
 
-          {/* --- NEW: ROLES & PERMISSIONS TAB REDIRECT --- */}
+          {/* --- ROLES & PERMISSIONS TAB REDIRECT --- */}
           {activeTab === 'permissions' && (
             <div className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden h-[400px] flex flex-col items-center justify-center text-center p-8">
               <div className="w-16 h-16 bg-blue-50 border border-blue-100 rounded-full flex items-center justify-center mb-4 shadow-inner">
@@ -583,6 +598,19 @@ export default function GeneralSettingsPage() {
             setIsProvisionModalOpen(false);
           }} 
           employees={unprovisionedEmployees} 
+        />
+      )}
+
+      {/* --- EDIT USER MODAL --- */}
+      {userToEdit && (
+        <EditUserModal 
+          isOpen={!!userToEdit} 
+          user={userToEdit}
+          onClose={() => setUserToEdit(null)} 
+          onSuccess={(updatedUser: any) => {
+            setUsers(users.map(u => u.id === updatedUser.id ? updatedUser : u));
+            setUserToEdit(null);
+          }} 
         />
       )}
 

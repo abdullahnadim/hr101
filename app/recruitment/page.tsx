@@ -1,13 +1,18 @@
 'use client';
 import { useEffect, useState } from 'react';
 import ScheduleModal from '@/components/ScheduleModal';
-import { Play, Calendar as CalendarIcon, Users, Clock, ArrowRight, Video, MapPin } from 'lucide-react';
+import BulkMessageModal from '@/components/BulkMessageModal'; // NEW: Bulk messaging modal
+import { Play, Calendar as CalendarIcon, Users, Clock, ArrowRight, Video, MapPin, MessageSquare } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Dashboard() {
   const [candidates, setCandidates] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
+
+  // NEW: State for bulk messaging selections
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
 
   const fetchCandidates = () => {
     fetch('/api/candidates')
@@ -37,6 +42,23 @@ export default function Dashboard() {
     const dateB = new Date(`${b.interview.date.split('T')[0]}T${b.interview.startTime}`);
     return dateA.getTime() - dateB.getTime();
   }).slice(0, 6);
+
+  // NEW: Selection toggle handlers
+  const toggleAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(upcomingInterviews.map(c => c.id));
+    } else {
+      setSelectedIds([]);
+    }
+  };
+
+  const toggleCandidate = (id: string, checked: boolean) => {
+    if (checked) {
+      setSelectedIds(prev => [...prev, id]);
+    } else {
+      setSelectedIds(prev => prev.filter(cId => cId !== id));
+    }
+  };
 
   return (
     <>
@@ -96,11 +118,39 @@ export default function Dashboard() {
 
         {/* Upcoming Interviews Section */}
         <div className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-          <div className="px-6 py-5 border-b border-neutral-100 flex justify-between items-center">
-            <h2 className="font-semibold text-neutral-800">Upcoming Interviews</h2>
-            <Link href="/calendar" className="text-sm font-medium text-neutral-500 hover:text-black flex items-center gap-1 transition-colors">
-              View Calendar <ArrowRight size={14} />
-            </Link>
+          <div className="px-6 py-5 border-b border-neutral-100 flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-neutral-50/30">
+            <div className="flex items-center gap-4">
+              <h2 className="font-semibold text-neutral-800">Upcoming Interviews</h2>
+              
+              {/* Contextual Bulk Action Button */}
+              {selectedIds.length > 0 && (
+                <button 
+                  onClick={() => setIsBulkModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-black text-white text-xs font-bold rounded-lg hover:bg-neutral-800 transition-all shadow-sm animate-in fade-in zoom-in-95"
+                >
+                  <MessageSquare size={14} /> Message ({selectedIds.length})
+                </button>
+              )}
+            </div>
+            
+            <div className="flex items-center gap-5">
+              {/* Select All Checkbox */}
+              {upcomingInterviews.length > 0 && (
+                <label className="flex items-center gap-2 text-xs font-semibold text-neutral-600 cursor-pointer hover:text-neutral-900 transition-colors">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-neutral-300 text-black focus:ring-black cursor-pointer w-4 h-4"
+                    checked={selectedIds.length === upcomingInterviews.length && upcomingInterviews.length > 0}
+                    onChange={(e) => toggleAll(e.target.checked)}
+                  /> 
+                  Select All
+                </label>
+              )}
+              
+              <Link href="/calendar" className="text-sm font-medium text-neutral-500 hover:text-black flex items-center gap-1 transition-colors">
+                View Calendar <ArrowRight size={14} />
+              </Link>
+            </div>
           </div>
           
           <div className="p-6">
@@ -108,37 +158,64 @@ export default function Dashboard() {
               <div className="text-center py-10 text-neutral-400 text-sm">Loading upcoming schedule...</div>
             ) : upcomingInterviews.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {upcomingInterviews.map((c: any) => (
-                  <div key={c.id} className="p-4 rounded-lg border border-neutral-200 hover:border-black transition-colors bg-neutral-50/50 flex flex-col gap-3">
-                    
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <div className="font-semibold text-neutral-900 text-sm">{c.name}</div>
-                        <div className="text-xs text-neutral-500">{c.position}</div>
+                {upcomingInterviews.map((c: any) => {
+                  const isSelected = selectedIds.includes(c.id);
+                  
+                  return (
+                    <div 
+                      key={c.id} 
+                      className={`p-4 rounded-xl border transition-all duration-200 flex flex-col gap-3 relative group cursor-pointer ${
+                        isSelected 
+                          ? 'bg-blue-50/40 border-blue-300 shadow-sm ring-1 ring-blue-100' 
+                          : 'bg-white border-neutral-200 hover:border-neutral-300 hover:shadow-sm'
+                      }`}
+                      onClick={() => toggleCandidate(c.id, !isSelected)}
+                    >
+                      {/* Interactive Card Checkbox */}
+                      <div className="absolute top-4 right-4 z-10">
+                         <input 
+                          type="checkbox" 
+                          className={`rounded border-neutral-300 text-blue-600 focus:ring-blue-600 cursor-pointer w-4 h-4 transition-opacity duration-200 ${
+                            isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+                          }`}
+                          checked={isSelected}
+                          onChange={(e) => {
+                            e.stopPropagation(); // Prevent card click from double-firing
+                            toggleCandidate(c.id, e.target.checked);
+                          }}
+                        />
                       </div>
-                      <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase">
-                        {c.interview.startTime}
-                      </span>
+
+                      <div className="flex justify-between items-start pr-8">
+                        <div>
+                          <div className="font-semibold text-neutral-900 text-sm">{c.name}</div>
+                          <div className="text-xs text-neutral-500">{c.position}</div>
+                        </div>
+                        <span className="bg-neutral-100 text-neutral-700 px-2.5 py-1 rounded-md text-[10px] font-bold tracking-wider uppercase">
+                          {c.interview.startTime}
+                        </span>
+                      </div>
+                      
+                      <div className="pt-3 border-t border-neutral-100 flex justify-between items-center text-xs mt-1">
+                        <div className="text-neutral-500 font-medium flex items-center gap-1.5">
+                          <CalendarIcon size={14} className="text-neutral-400" />
+                          {new Date(c.interview.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </div>
+                        <div className="flex items-center gap-1 font-medium">
+                          {c.interview.type === 'ONLINE' ? (
+                            <span className="text-blue-600 flex items-center gap-1.5"><Video size={14} /> Online</span>
+                          ) : (
+                            <span className="text-neutral-600 flex items-center gap-1.5"><MapPin size={14} /> In-Person</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    
-                    <div className="pt-3 border-t border-neutral-200 flex justify-between items-center text-xs">
-                      <div className="text-neutral-500 font-medium">
-                        {new Date(c.interview.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}
-                      </div>
-                      <div className="flex items-center gap-1 font-medium">
-                        {c.interview.type === 'ONLINE' ? (
-                          <span className="text-blue-600 flex items-center gap-1"><Video size={12} /> Online</span>
-                        ) : (
-                          <span className="text-neutral-600 flex items-center gap-1"><MapPin size={12} /> In-Person</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-12 flex flex-col items-center justify-center">
-                <div className="h-12 w-12 bg-neutral-100 rounded-full flex items-center justify-center mb-3">
+                <div className="h-12 w-12 bg-neutral-50 rounded-full flex items-center justify-center mb-3 border border-neutral-100">
                   <CalendarIcon size={24} className="text-neutral-400" />
                 </div>
                 <h3 className="text-neutral-900 font-medium mb-1">No upcoming interviews</h3>
@@ -163,6 +240,17 @@ export default function Dashboard() {
         onClose={() => setIsScheduleModalOpen(false)}
         candidates={candidates}
         onSuccess={fetchCandidates}
+      />
+
+      {/* NEW: Bulk Messaging Integration */}
+      <BulkMessageModal 
+        isOpen={isBulkModalOpen} 
+        onClose={() => setIsBulkModalOpen(false)} 
+        selectedCandidateIds={selectedIds}
+        onSuccess={() => {
+          alert("Messages dispatched successfully!");
+          setSelectedIds([]); 
+        }}
       />
     </>
   );
