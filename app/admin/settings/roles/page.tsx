@@ -37,7 +37,7 @@ export default function RoleManagementPage() {
 
   const selectRole = (role: any) => {
     setActiveRoleId(role.id);
-    const perms = new Set(role.permissions.map((p: any) => `${p.module}:${p.action}`));
+    const perms = new Set<string>(role.permissions.map((p: any) => `${p.module}:${p.action}`));
     setLocalPermissions(perms);
   };
 

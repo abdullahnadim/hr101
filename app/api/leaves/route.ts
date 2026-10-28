@@ -13,8 +13,8 @@ export async function GET() {
     const leaveRequests = await prisma.leaveRequest.findMany({
       include: {
         employee: {
-          select: { name: true, employeeCode: true, department: true, position: true, profileImage: true } // adjust if profileImage is stored differently
-        }
+  select: { name: true, employeeCode: true, department: true, position: true, customData: true }
+}
       },
       orderBy: { createdAt: 'desc' }
     });
