@@ -39,11 +39,13 @@ export default function BookConferenceRoom() {
   const fetchRooms = useCallback(async () => {
     try {
       const res = await fetch('/api/rooms');
-      const data = await res.json();
-      const activeRooms = data.filter((r: any) => r.status === 'ACTIVE');
-      setRooms(activeRooms);
-      if (activeRooms.length > 0 && !selectedRoom) {
-        setSelectedRoom(activeRooms[0]); // Select first room by default
+      if (res.ok) {
+        const data = await res.json();
+        const activeRooms = data.filter((r: any) => r.status === 'ACTIVE');
+        setRooms(activeRooms);
+        if (activeRooms.length > 0 && !selectedRoom) {
+          setSelectedRoom(activeRooms[0]); // Select first room by default
+        }
       }
     } catch (error) {
       console.error("Failed to load rooms", error);
@@ -58,18 +60,19 @@ export default function BookConferenceRoom() {
     setLoadingSchedule(true);
     try {
       const res = await fetch('/api/bookings');
-      const data = await res.json();
-      
-      const filtered = data.filter((b: any) => {
-        const bookingDate = b.date.split('T')[0];
-        return (
-          b.status === 'APPROVED' && 
-          bookingDate === formData.date && 
-          (b.roomName === selectedRoom.name || b.roomId === selectedRoom.id)
-        );
-      }).sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
+      if (res.ok) {
+        const data = await res.json();
+        const filtered = data.filter((b: any) => {
+          const bookingDate = b.date.split('T')[0];
+          return (
+            b.status === 'APPROVED' && 
+            bookingDate === formData.date && 
+            (b.roomId === selectedRoom.id || b.roomName === selectedRoom.name)
+          );
+        }).sort((a: any, b: any) => a.startTime.localeCompare(b.startTime));
 
-      setRoomSchedule(filtered);
+        setRoomSchedule(filtered);
+      }
     } catch (error) {
       console.error("Failed to fetch schedule", error);
     } finally {
@@ -104,14 +107,18 @@ export default function BookConferenceRoom() {
       setIsSearching(true);
       try {
         const res = await fetch('/api/employees');
-        const data = await res.json();
-        const filtered = data.filter((emp: any) => 
-          emp.employeeCode?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-          emp.name?.toLowerCase().includes(searchQuery.toLowerCase())
-        );
-        setSuggestions(filtered.slice(0, 5));
-        setShowDropdown(true);
-      } catch (error) {}
+        if (res.ok) {
+          const data = await res.json();
+          const filtered = data.filter((emp: any) => 
+            emp.employeeCode?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+            emp.name?.toLowerCase().includes(searchQuery.toLowerCase())
+          );
+          setSuggestions(filtered.slice(0, 5));
+          setShowDropdown(true);
+        }
+      } catch (error) {
+        console.error("Failed to fetch employees", error);
+      }
       setIsSearching(false);
     };
     const debounce = setTimeout(fetchSuggestions, 300);
@@ -148,11 +155,12 @@ export default function BookConferenceRoom() {
         fetchRoomSchedule();
         setTimeout(() => setSuccess(false), 4000);
         setFormData(prev => ({ ...prev, reason: '', startTime: '09:00' }));
+        setSearchQuery(''); // Reset search
       } else {
-        alert(data.error || 'Failed to process booking.');
+        alert(data.message || data.error || 'Failed to process booking.');
       }
     } catch (error) {
-      alert("An error occurred.");
+      alert("An network error occurred.");
     } finally {
       setSubmitting(false);
     }
@@ -176,13 +184,13 @@ export default function BookConferenceRoom() {
   } catch { amenities = []; }
 
   return (
-    <div className="min-h-screen bg-neutral-50/50 p-6 md:p-12 pb-24">
+    <div className="min-h-screen bg-neutral-50/50 p-6 md:p-12 pb-24 animate-in fade-in duration-300">
       <div className="max-w-6xl mx-auto space-y-8">
         
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">Conference Room Booking</h1>
           <p className="text-neutral-500 max-w-lg mx-auto text-sm">Select a workspace to check live availability, view daily schedules, and submit your reservation.</p>
-          {isAdmin && <span className="inline-block mt-2 px-3 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">Admin Mode: Active bookings auto-approve</span>}
+          {isAdmin && <span className="inline-block mt-2 px-3 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full border border-blue-200 shadow-sm">Admin Mode: Active bookings auto-approve</span>}
         </div>
 
         {/* 1. Room Selection Tabs / Cards */}
@@ -265,11 +273,11 @@ export default function BookConferenceRoom() {
                     {isSearching && <Loader2 className="absolute right-3 top-3 animate-spin text-neutral-400" size={16} />}
                   </div>
                   {showDropdown && suggestions.length > 0 && (
-                    <ul className="absolute z-10 w-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl overflow-hidden">
+                    <ul className="absolute z-10 w-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl overflow-hidden max-h-48 overflow-y-auto">
                       {suggestions.map((emp) => (
                         <li key={emp.id} onClick={() => selectEmployee(emp)} className="px-4 py-3 hover:bg-neutral-50 cursor-pointer border-b border-neutral-100 last:border-0">
                           <div className="font-bold text-neutral-900 text-sm">{emp.name}</div>
-                          <div className="text-xs text-neutral-500 font-mono mt-0.5">{emp.employeeCode} • {emp.department}</div>
+                          <div className="text-xs text-neutral-500 font-mono mt-0.5">{emp.employeeCode} - {emp.department}</div>
                         </li>
                       ))}
                     </ul>
@@ -330,7 +338,7 @@ export default function BookConferenceRoom() {
                   </div>
                 </div>
 
-                <button type="submit" disabled={submitting} className="w-full mt-2 bg-black text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 transition-colors text-sm shadow-md">
+                <button type="submit" disabled={submitting} className="w-full mt-2 bg-black text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-neutral-800 transition-colors text-sm shadow-md active:scale-95">
                   {submitting && <Loader2 className="animate-spin" size={16} />} {isAdmin ? 'Book Room Instantly' : 'Submit Booking Request'}
                 </button>
               </form>
@@ -340,7 +348,7 @@ export default function BookConferenceRoom() {
             <div className="bg-neutral-50 border border-neutral-200 rounded-xl p-5 flex flex-col h-full">
               <div className="flex items-center justify-between border-b border-neutral-200 pb-3 mb-4">
                 <h3 className="font-bold text-neutral-900 flex items-center gap-2 text-sm">
-                  <CalendarRange size={16} className="text-blue-600" /> Schedule for {formData.date}
+                  <CalendarRange size={16} className="text-blue-600" /> Schedule for {new Date(formData.date).toLocaleDateString(undefined, {month: 'short', day: 'numeric'})}
                 </h3>
               </div>
 
@@ -354,7 +362,7 @@ export default function BookConferenceRoom() {
                   </div>
                 ) : (
                   roomSchedule.map((b) => (
-                    <div key={b.id} className="bg-white p-3.5 rounded-lg border border-neutral-200 shadow-xs space-y-1">
+                    <div key={b.id} className="bg-white p-3.5 rounded-lg border border-neutral-200 shadow-sm space-y-1 hover:border-blue-300 transition-colors">
                       <div className="text-xs font-bold text-blue-600">
                         {formatTimeRange(b.startTime, b.durationMinutes)}
                       </div>

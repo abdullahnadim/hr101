@@ -12,7 +12,7 @@ const timeToMinutes = (timeStr: string) => {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { employeeId, teamName, reason, date, startTime, durationMinutes, status, roomName } = body;
+    const { employeeId, teamName, reason, date, startTime, durationMinutes, status, roomName, roomId } = body;
 
     const newStart = timeToMinutes(startTime);
     const newEnd = newStart + parseInt(durationMinutes);
@@ -22,7 +22,11 @@ export async function POST(request: Request) {
       where: {
         date: new Date(date),
         status: 'APPROVED',
-        roomName: roomName || 'FAL Conference Room' // Scope collisions to the specific room
+        // Scope to exact roomId if available, fallback to string name for legacy rows
+        OR: [
+          ...(roomId ? [{ roomId }] : []),
+          { roomName: roomName || 'FAL Conference Room' }
+        ]
       }
     });
 
@@ -42,6 +46,7 @@ export async function POST(request: Request) {
     const newBooking = await prisma.roomBooking.create({
       data: {
         roomName: roomName || 'FAL Conference Room',
+        roomId: roomId || null,
         employeeId,
         teamName,
         reason,
@@ -56,7 +61,7 @@ export async function POST(request: Request) {
       success: true, 
       booking: newBooking, 
       message: isConflict ? 'Time slot conflict detected for this room. Forwarded to Admin.' : 'Request processed successfully.' 
-    });
+    }, { status: isConflict ? 409 : 201 });
 
   } catch (error) {
     console.error("Booking POST Error:", error);
@@ -66,7 +71,6 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    // Fetch all bookings (to populate the calendar and the admin queue)
     const bookings = await prisma.roomBooking.findMany({
       include: {
         employee: {

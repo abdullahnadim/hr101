@@ -75,7 +75,9 @@ model Organization {
   rooms           Room[]
   itAssets        ITAsset[]
   payrollSettings PayrollSettings?
-  
+  receptionBills  ReceptionBill[]
+  vendors         Vendor[]
+
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 }
@@ -114,6 +116,8 @@ model Employee {
   customData           Json?
   joiningDate          DateTime
   status               String         @default("ACTIVE") 
+  bloodGroup    String? 
+  gender        String?  
 
   // Payroll & Transport Constants
   baseSalary           Float          @default(0)
@@ -134,6 +138,9 @@ model Employee {
   payrolls             Payroll[]
   loans                Loan[]
   attendances          Attendance[]
+
+  // Reception 
+  receptionBills  ReceptionBill[]
   
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
@@ -458,4 +465,78 @@ model AuditLog {
   timestamp DateTime @default(now())
 
   @@index([userId])
+}
+
+// ==========================================
+// 9. RECEPTION & VENDORS
+// ==========================================
+
+model Vendor {
+  id           String          @id @default(cuid())
+  orgId        String
+  organization Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  
+  name         String
+  phone        String?
+  email        String?
+  address      String?
+  status       String          @default("ACTIVE")
+  
+  bills        ReceptionBill[]
+  
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  
+  @@index([orgId])
+}
+
+model ReceptionBill {
+  id              String       @id @default(cuid())
+  orgId           String
+  organization    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  
+  // Auto-generated system sequence (e.g., FAL-Bill-2026-0001)
+  systemSerialNo  String       @unique 
+  
+  // Manual Invoice/Bill Number printed on the physical document
+  billNumber      String?      
+  
+  // The actual date printed on the vendor's physical invoice
+  billDate        DateTime     @db.Date
+  
+  // Auto-captured when the receptionist clicks "Save"
+  entryAt         DateTime     @default(now()) 
+  
+  // Financial Details
+  category        String       // Supplier/party bill, Salary, Overtime, Incentive, Other
+  amount          Float
+  department      String?      // Target department for the bill
+  description     String?      @db.Text // Brief Description / Purpose
+  
+  // Workflow Status Tracking
+  status          String       @default("DRAFT") // DRAFT, SENT_TO_ACCOUNTS, DISCREPANCY, SENT_TO_AUDIT, APPROVED_FOR_DISBURSEMENT
+  discrepancyNote String?      @db.Text
+
+  // Workflow Timestamp Tracking
+  accountsReceivedAt DateTime?
+  auditReceivedAt    DateTime?
+  approvedAt         DateTime?
+  disbursedAt        DateTime?
+  
+  // Relational connection to Vendor
+  vendorId        String
+  vendor          Vendor       @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  
+  // Track which receptionist entered the bill
+  recordedById    String?
+  recordedBy      Employee?    @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([orgId])
+  @@index([systemSerialNo])
+  @@index([vendorId])
+  @@index([recordedById])
+  @@index([status])
 }

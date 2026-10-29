@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { 
   Save, Check, Loader2, Building, Clock, Globe, Bell, 
   Calendar, DoorOpen, Plus, Trash2, 
-  KeyRound, UserPlus, CheckCircle2, ShieldCheck, ArrowRight
+  KeyRound, UserPlus, CheckCircle2, ShieldCheck, ArrowRight, Settings
 } from 'lucide-react';
 import { useSettingsStore } from '@/store/useSettingsStore';
 import ProvisionUserModal from '@/components/ProvisionUserModal';
@@ -50,7 +50,7 @@ export default function GeneralSettingsPage() {
   const [employees, setEmployees] = useState<any[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [isProvisionModalOpen, setIsProvisionModalOpen] = useState(false);
-  const [userToEdit, setUserToEdit] = useState<any>(null); // NEW: State for editing roles
+  const [userToEdit, setUserToEdit] = useState<any>(null);
 
   const fetchData = useCallback(async () => {
     try {
@@ -183,21 +183,23 @@ export default function GeneralSettingsPage() {
   const unprovisionedEmployees = employees.filter(emp => !users.some(u => u.employeeId === emp.id));
 
   return (
-    <div className="min-h-screen bg-neutral-50/30 pb-24">
-      <header className="bg-white border-b border-neutral-200 px-8 py-5 flex justify-between items-center sticky top-0 z-20 shadow-sm">
+    <div className="min-h-screen bg-neutral-50/30 pb-24 animate-in fade-in duration-300">
+      <header className="bg-white/90 backdrop-blur-xl border-b border-neutral-200 px-8 py-5 flex justify-between items-center sticky top-0 z-20 shadow-sm">
         <div>
-          <h1 className="text-xl font-bold text-neutral-900 tracking-tight">Platform Settings</h1>
+          <h1 className="text-xl font-bold text-neutral-900 tracking-tight flex items-center gap-2">
+            <Settings className="text-blue-600" size={20} /> Platform Settings
+          </h1>
           <p className="text-sm text-neutral-500 mt-1">Manage global configurations, workspaces, and system access.</p>
         </div>
         {activeTab === 'general' && (
-          <button onClick={handleSaveGeneral} disabled={isSaving || isSaved} className={`flex items-center gap-2 px-6 py-2.5 rounded-lg transition-all text-sm font-bold shadow-sm disabled:opacity-80 ${isSaved ? 'bg-emerald-600 text-white' : 'bg-black text-white hover:bg-neutral-800'}`}>
+          <button onClick={handleSaveGeneral} disabled={isSaving || isSaved} className={`flex items-center gap-2 px-6 py-2.5 rounded-lg transition-all text-sm font-bold shadow-sm disabled:opacity-80 active:scale-95 ${isSaved ? 'bg-emerald-600 text-white' : 'bg-black text-white hover:bg-neutral-800'}`}>
             {isSaving ? <Loader2 size={16} className="animate-spin" /> : isSaved ? <Check size={16} /> : <Save size={16} />}
             {isSaving ? 'Saving...' : isSaved ? 'Saved Successfully!' : 'Save Changes'}
           </button>
         )}
       </header>
 
-      <div className="p-8 max-w-6xl mx-auto flex flex-col md:flex-row gap-8">
+      <div className="p-8 max-w-7xl mx-auto flex flex-col md:flex-row gap-8">
         
         <aside className="w-full md:w-64 shrink-0">
           <nav className="flex flex-col gap-1.5 sticky top-28">
@@ -208,8 +210,8 @@ export default function GeneralSettingsPage() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-semibold transition-all ${
-                    isActive ? 'bg-white border border-neutral-200 text-black shadow-sm' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 border border-transparent'
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-bold transition-all duration-200 ${
+                    isActive ? 'bg-white border border-neutral-200 text-black shadow-sm shadow-neutral-200/50' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900 border border-transparent'
                   }`}
                 >
                   <Icon size={18} className={isActive ? 'text-blue-600' : 'text-neutral-400'} />
@@ -226,7 +228,7 @@ export default function GeneralSettingsPage() {
           {activeTab === 'general' && (
             <>
               <section className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-                <div className="px-6 py-5 border-b border-neutral-100 bg-gradient-to-b from-white to-neutral-50 flex items-center gap-2.5">
+                <div className="px-6 py-5 border-b border-neutral-100 bg-neutral-50/50 flex items-center gap-2.5">
                   <Building size={18} className="text-blue-600" />
                   <div>
                     <h2 className="font-bold text-neutral-900">Company Profile</h2>
@@ -236,13 +238,13 @@ export default function GeneralSettingsPage() {
                 <div className="p-6 md:p-8">
                   <div className="max-w-md">
                     <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Legal Company Name</label>
-                    <input type="text" value={localCompany} onChange={(e) => setLocalCompany(e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" placeholder="e.g. Acme Corporation" />
+                    <input type="text" value={localCompany} onChange={(e) => setLocalCompany(e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-black text-sm transition-colors" placeholder="e.g. Acme Corporation" />
                   </div>
                 </div>
               </section>
 
               <section className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-                <div className="px-6 py-5 border-b border-neutral-100 bg-gradient-to-b from-white to-neutral-50 flex items-center gap-2.5">
+                <div className="px-6 py-5 border-b border-neutral-100 bg-neutral-50/50 flex items-center gap-2.5">
                   <Clock size={18} className="text-blue-600" />
                   <div>
                     <h2 className="font-bold text-neutral-900">Business Hours & Region</h2>
@@ -252,7 +254,7 @@ export default function GeneralSettingsPage() {
                 <div className="p-6 md:p-8 grid grid-cols-1 lg:grid-cols-2 gap-8">
                   <div>
                     <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Globe size={14} className="text-neutral-400" /> Operating Timezone</label>
-                    <select value={localTz} onChange={(e) => setLocalTz(e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm bg-white cursor-pointer">
+                    <select value={localTz} onChange={(e) => setLocalTz(e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-black text-sm bg-white cursor-pointer transition-colors font-medium">
                       <option value="Asia/Dhaka">Asia/Dhaka (BDT)</option>
                       <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
                       <option value="America/New_York">America/New_York (EST)</option>
@@ -262,11 +264,11 @@ export default function GeneralSettingsPage() {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Work Day Start</label>
-                      <input type="time" value={localStart} onChange={(e) => setLocalStart(e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"/>
+                      <input type="time" value={localStart} onChange={(e) => setLocalStart(e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-black text-sm transition-colors font-medium"/>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Work Day End</label>
-                      <input type="time" value={localEnd} onChange={(e) => setLocalEnd(e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm"/>
+                      <input type="time" value={localEnd} onChange={(e) => setLocalEnd(e.target.value)} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-black text-sm transition-colors font-medium"/>
                     </div>
                   </div>
                 </div>
@@ -278,7 +280,7 @@ export default function GeneralSettingsPage() {
           {activeTab === 'rooms' && (
             <>
               <section className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden">
-                <div className="px-6 py-5 border-b border-neutral-100 bg-gradient-to-b from-white to-neutral-50 flex items-center justify-between">
+                <div className="px-6 py-5 border-b border-neutral-100 bg-neutral-50/50 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <DoorOpen size={18} className="text-indigo-600" />
                     <div>
@@ -291,11 +293,11 @@ export default function GeneralSettingsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                     <div>
                       <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Room Name</label>
-                      <input type="text" value={newRoom.name} onChange={(e) => setNewRoom({...newRoom, name: e.target.value})} placeholder="e.g. Conference Room A" className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" required />
+                      <input type="text" value={newRoom.name} onChange={(e) => setNewRoom({...newRoom, name: e.target.value})} placeholder="e.g. Conference Room A" className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-black text-sm transition-colors" required />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Max Capacity</label>
-                      <input type="number" value={newRoom.capacity} onChange={(e) => setNewRoom({...newRoom, capacity: e.target.value})} placeholder="e.g. 10" className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" required min="1" />
+                      <input type="number" value={newRoom.capacity} onChange={(e) => setNewRoom({...newRoom, capacity: e.target.value})} placeholder="e.g. 10" className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-black text-sm transition-colors" required min="1" />
                     </div>
                   </div>
                   <div>
@@ -304,7 +306,7 @@ export default function GeneralSettingsPage() {
                       {['TV', 'Video Conferencing', 'Whiteboard', 'Projector', 'Coffee Machine'].map((item) => (
                         <button 
                           key={item} type="button" onClick={() => toggleAmenity(item)}
-                          className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${newRoom.amenities.includes(item) ? 'bg-indigo-50 border-indigo-200 text-indigo-700' : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${newRoom.amenities.includes(item) ? 'bg-indigo-50 border-indigo-200 text-indigo-700 shadow-sm' : 'bg-white border-neutral-200 text-neutral-600 hover:bg-neutral-50'}`}
                         >
                           {item}
                         </button>
@@ -312,7 +314,7 @@ export default function GeneralSettingsPage() {
                     </div>
                   </div>
                   <div className="flex justify-end pt-2">
-                    <button type="submit" disabled={roomSaving} className="flex items-center gap-2 px-5 py-2.5 bg-black text-white rounded-lg hover:bg-neutral-800 transition-colors text-sm font-bold disabled:opacity-50">
+                    <button type="submit" disabled={roomSaving} className="flex items-center gap-2 px-5 py-2.5 bg-black text-white rounded-lg hover:bg-neutral-800 transition-colors text-sm font-bold disabled:opacity-50 active:scale-95">
                       {roomSaving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Register Room
                     </button>
                   </div>
@@ -338,14 +340,14 @@ export default function GeneralSettingsPage() {
                       }
 
                       return (
-                        <div key={room.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-neutral-50/50 transition-colors">
+                        <div key={room.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-neutral-50/80 transition-colors group">
                           <div>
                             <h3 className="font-bold text-neutral-900 text-base">{room.name}</h3>
                             <div className="flex items-center gap-4 mt-2">
-                              <span className="flex items-center gap-1.5 text-xs font-medium text-neutral-600 bg-neutral-100 px-2 py-1 rounded-md w-fit">
+                              <span className="flex items-center gap-1.5 text-xs font-bold text-neutral-600 bg-white border border-neutral-200 px-2 py-1 rounded-md w-fit shadow-sm">
                                 <DoorOpen size={14} /> {room.capacity} People
                               </span>
-                              <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${room.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
+                              <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${room.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-red-50 text-red-700 border border-red-100'}`}>
                                 {room.status}
                               </span>
                             </div>
@@ -353,12 +355,12 @@ export default function GeneralSettingsPage() {
                           <div className="flex flex-col md:flex-row items-start md:items-center gap-4 md:gap-6">
                             <div className="flex flex-wrap gap-1.5">
                               {parsedAmenities.map((a: string, i: number) => (
-                                <span key={i} className="text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-600 px-2 py-1 rounded">
+                                <span key={i} className="text-[10px] font-bold uppercase tracking-wider bg-indigo-50 text-indigo-600 px-2 py-1 rounded border border-indigo-100">
                                   {a}
                                 </span>
                               ))}
                             </div>
-                            <button onClick={() => handleDeleteRoom(room.id)} className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete Room">
+                            <button onClick={() => handleDeleteRoom(room.id)} className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100" title="Delete Room">
                               <Trash2 size={16} />
                             </button>
                           </div>
@@ -373,85 +375,83 @@ export default function GeneralSettingsPage() {
 
           {/* --- SYSTEM USERS TAB --- */}
           {activeTab === 'users' && (
-            <>
-              <section className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-                <div className="px-6 py-5 border-b border-neutral-100 bg-gradient-to-b from-white to-neutral-50 flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <KeyRound size={18} className="text-amber-600" />
-                    <div>
-                      <h2 className="font-bold text-neutral-900">Provisioned Accounts</h2>
-                      <p className="text-xs text-neutral-500 mt-0.5">Staff with active dashboard logins.</p>
-                    </div>
+            <section className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
+              <div className="px-6 py-5 border-b border-neutral-100 bg-neutral-50/50 flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <KeyRound size={18} className="text-amber-600" />
+                  <div>
+                    <h2 className="font-bold text-neutral-900">Provisioned Accounts</h2>
+                    <p className="text-xs text-neutral-500 mt-0.5">Staff with active dashboard logins.</p>
                   </div>
-                  <button onClick={() => setIsProvisionModalOpen(true)} className="flex items-center gap-2 px-4 py-2 bg-black text-white text-xs font-bold rounded-lg hover:bg-neutral-800 transition-colors shadow-sm">
-                    <UserPlus size={14} /> Provision Access
-                  </button>
                 </div>
-                
-                <div className="divide-y divide-neutral-100 min-h-[300px]">
-                  {loadingUsers ? (
-                    <div className="p-12 flex justify-center text-neutral-400"><Loader2 className="animate-spin" /></div>
-                  ) : users.length === 0 ? (
-                    <div className="p-12 text-center text-neutral-500 text-sm border border-dashed border-neutral-200 rounded-xl m-6">No user accounts provisioned yet.</div>
-                  ) : (
-                    <table className="w-full text-sm text-left">
-                      <thead className="bg-neutral-50 text-neutral-600 font-semibold border-b border-neutral-200">
-                        <tr>
-                          <th className="px-6 py-4">Account Holder</th>
-                          <th className="px-6 py-4">Assigned Role</th>
-                          <th className="px-6 py-4 text-right">Actions</th>
+                <button onClick={() => setIsProvisionModalOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-black text-white text-xs font-bold rounded-lg hover:bg-neutral-800 transition-colors shadow-sm active:scale-95">
+                  <UserPlus size={14} /> Provision Access
+                </button>
+              </div>
+              
+              <div className="overflow-x-auto min-h-[300px]">
+                {loadingUsers ? (
+                  <div className="p-12 flex justify-center text-neutral-400"><Loader2 className="animate-spin" /></div>
+                ) : users.length === 0 ? (
+                  <div className="p-12 text-center text-neutral-500 text-sm border border-dashed border-neutral-200 rounded-xl m-6">No user accounts provisioned yet.</div>
+                ) : (
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-neutral-50 text-neutral-600 font-bold border-b border-neutral-200 text-[11px] uppercase tracking-wider sticky top-0">
+                      <tr>
+                        <th className="px-6 py-4">Account Holder</th>
+                        <th className="px-6 py-4">Assigned Role</th>
+                        <th className="px-6 py-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-neutral-100">
+                      {users.map(user => (
+                        <tr key={user.id} className="hover:bg-neutral-50/80 transition-colors group">
+                          <td className="px-6 py-4">
+                            <div className="font-bold text-neutral-900 flex items-center gap-2 text-base">
+                              {user.employee?.name || 'Unlinked Account'}
+                              {user.employeeId && (
+                                <span title="Linked to HR Profile">
+                                  <CheckCircle2 size={16} className="text-emerald-500" />
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs font-medium text-neutral-500 mt-0.5 font-mono">{user.email}</div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                              user.role?.name === 'ADMIN' || user.role?.name === 'Super Admin' ? 'bg-purple-50 text-purple-700 border border-purple-100' :
+                              user.role?.name ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-neutral-100 text-neutral-700 border border-neutral-200'
+                            }`}>
+                              {user.role?.name ? user.role.name.replace('_', ' ') : 'No Role'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                              <button 
+                                onClick={() => setUserToEdit(user)}
+                                className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-blue-100 transition-colors"
+                              >
+                                Edit Access
+                              </button>
+                              <button onClick={() => handleRevokeAccess(user.id)} className="text-xs font-bold text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-red-100 transition-colors">
+                                Revoke
+                              </button>
+                            </div>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody className="divide-y divide-neutral-100">
-                        {users.map(user => (
-                          <tr key={user.id} className="hover:bg-neutral-50/50 transition-colors">
-                            <td className="px-6 py-4">
-                              <div className="font-bold text-neutral-900 flex items-center gap-2">
-                                {user.employee?.name || 'Unlinked Account'}
-                                {user.employeeId && (
-                                  <span title="Linked to HR Profile">
-                                    <CheckCircle2 size={14} className="text-emerald-500" />
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-xs text-neutral-500 mt-0.5">{user.email}</div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                                user.role?.name === 'ADMIN' || user.role?.name === 'Super Admin' ? 'bg-purple-100 text-purple-700' :
-                                user.role?.name ? 'bg-blue-100 text-blue-700' : 'bg-neutral-100 text-neutral-700'
-                              }`}>
-                                {user.role?.name ? user.role.name.replace('_', ' ') : 'No Role'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <div className="flex justify-end gap-2">
-                                <button 
-                                  onClick={() => setUserToEdit(user)}
-                                  className="text-xs font-bold text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-blue-100 transition-colors"
-                                >
-                                  Edit Access
-                                </button>
-                                <button onClick={() => handleRevokeAccess(user.id)} className="text-xs font-bold text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-lg border border-transparent hover:border-red-100 transition-colors">
-                                  Revoke
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </section>
-            </>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            </section>
           )}
 
           {/* --- LEAVE POLICIES TAB --- */}
           {activeTab === 'leave' && (
             <>
               <section className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden flex flex-col">
-                <div className="px-6 py-5 border-b border-neutral-100 bg-gradient-to-b from-white to-neutral-50 flex items-center justify-between">
+                <div className="px-6 py-5 border-b border-neutral-100 bg-neutral-50/50 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <Calendar size={18} className="text-emerald-600" />
                     <div>
@@ -464,11 +464,11 @@ export default function GeneralSettingsPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Policy Name</label>
-                      <input type="text" value={newPolicy.name} onChange={(e) => setNewPolicy({...newPolicy, name: e.target.value})} placeholder="e.g. Annual Paid Leave" className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" required />
+                      <input type="text" value={newPolicy.name} onChange={(e) => setNewPolicy({...newPolicy, name: e.target.value})} placeholder="e.g. Annual Paid Leave" className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-black text-sm transition-colors" required />
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Days Per Year</label>
-                      <input type="number" value={newPolicy.daysPerYear} onChange={(e) => setNewPolicy({...newPolicy, daysPerYear: e.target.value})} placeholder="e.g. 15" className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black text-sm" required min="1" step="0.5" />
+                      <input type="number" value={newPolicy.daysPerYear} onChange={(e) => setNewPolicy({...newPolicy, daysPerYear: e.target.value})} placeholder="e.g. 15" className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg focus:outline-none focus:border-black text-sm transition-colors" required min="1" step="0.5" />
                     </div>
                   </div>
 
@@ -498,7 +498,7 @@ export default function GeneralSettingsPage() {
                   </div>
 
                   <div className="flex justify-end pt-2">
-                    <button type="submit" disabled={policySaving} className="flex items-center gap-2 px-5 py-2.5 bg-black text-white rounded-lg hover:bg-neutral-800 transition-colors text-sm font-bold disabled:opacity-50">
+                    <button type="submit" disabled={policySaving} className="flex items-center gap-2 px-5 py-2.5 bg-black text-white rounded-lg hover:bg-neutral-800 transition-colors text-sm font-bold disabled:opacity-50 active:scale-95">
                       {policySaving ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />} Create Policy
                     </button>
                   </div>
@@ -516,21 +516,21 @@ export default function GeneralSettingsPage() {
                     <div className="p-8 text-center text-neutral-500 text-sm">No leave policies defined yet.</div>
                   ) : (
                     leavePolicies.map(policy => (
-                      <div key={policy.id} className={`p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors ${!policy.isActive ? 'bg-neutral-50/50 opacity-75' : 'hover:bg-neutral-50/30'}`}>
+                      <div key={policy.id} className={`p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors ${!policy.isActive ? 'bg-neutral-50/50 opacity-75' : 'hover:bg-neutral-50/80 group'}`}>
                         <div>
                           <h3 className="font-bold text-neutral-900 text-base flex items-center gap-2">
                             {policy.name} 
-                            {!policy.isActive && <span className="text-[10px] bg-neutral-200 text-neutral-600 px-2 py-0.5 rounded-full uppercase tracking-wider">Inactive</span>}
+                            {!policy.isActive && <span className="text-[10px] bg-neutral-200 text-neutral-600 px-2 py-0.5 rounded-full uppercase tracking-wider font-bold">Inactive</span>}
                           </h3>
                           <div className="flex flex-wrap items-center gap-2 mt-2">
                             <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-md w-fit">
                               {policy.daysPerYear} Days/Yr
                             </span>
-                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md ${policy.isPaid ? 'bg-blue-50 text-blue-700' : 'bg-orange-50 text-orange-700'}`}>
+                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md border ${policy.isPaid ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-orange-50 text-orange-700 border-orange-100'}`}>
                               {policy.isPaid ? 'Paid' : 'Unpaid'}
                             </span>
                             {policy.carryForward && (
-                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-purple-50 text-purple-700">
+                              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md bg-purple-50 text-purple-700 border border-purple-100">
                                 Rollover: {policy.maxCarryForward} Days
                               </span>
                             )}
@@ -543,7 +543,7 @@ export default function GeneralSettingsPage() {
                           >
                             {policy.isActive ? 'Deactivate' : 'Activate'}
                           </button>
-                          <button onClick={() => handleDeletePolicy(policy.id)} className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete Policy">
+                          <button onClick={() => handleDeletePolicy(policy.id)} className="p-2 text-neutral-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100" title="Delete Policy">
                             <Trash2 size={16} />
                           </button>
                         </div>
@@ -557,17 +557,17 @@ export default function GeneralSettingsPage() {
 
           {/* --- ROLES & PERMISSIONS TAB REDIRECT --- */}
           {activeTab === 'permissions' && (
-            <div className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden h-[400px] flex flex-col items-center justify-center text-center p-8">
+            <div className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden h-[400px] flex flex-col items-center justify-center text-center p-8 animate-in zoom-in-95 duration-300">
               <div className="w-16 h-16 bg-blue-50 border border-blue-100 rounded-full flex items-center justify-center mb-4 shadow-inner">
                 <ShieldCheck size={28} className="text-blue-600" />
               </div>
               <h3 className="text-lg font-bold text-neutral-900">Advanced RBAC Management</h3>
               <p className="text-sm text-neutral-500 mt-2 max-w-sm mb-6">
-                Role management has been moved to a dedicated, highly secure control panel for granular module permissions.
+                Role management has been securely sandboxed to a dedicated control panel for granular module permissions.
               </p>
               <button 
-                onClick={() => router.push('/admin/settings/roles')}
-                className="flex items-center gap-2 px-6 py-3 bg-black text-white font-bold text-sm rounded-lg hover:bg-neutral-800 transition-colors shadow-md"
+                onClick={() => router.push('/configuration/roles')}
+                className="flex items-center gap-2 px-6 py-3 bg-black text-white font-bold text-sm rounded-lg hover:bg-neutral-800 transition-colors shadow-md active:scale-95"
               >
                 Go to RBAC Control Panel <ArrowRight size={16} />
               </button>
@@ -588,7 +588,7 @@ export default function GeneralSettingsPage() {
         </div>
       </div>
       
-      {/* --- PROVISIONING MODAL --- */}
+      {/* Modals remain structurally identical */}
       {isProvisionModalOpen && (
         <ProvisionUserModal 
           isOpen={isProvisionModalOpen} 
@@ -601,7 +601,6 @@ export default function GeneralSettingsPage() {
         />
       )}
 
-      {/* --- EDIT USER MODAL --- */}
       {userToEdit && (
         <EditUserModal 
           isOpen={!!userToEdit} 

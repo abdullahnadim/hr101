@@ -8,7 +8,6 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Await the params Promise required in Next.js 15+
     const resolvedParams = await params;
     const { status, startTime } = await request.json();
     
@@ -34,7 +33,6 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Await the params Promise required in Next.js 15+
     const resolvedParams = await params;
     const { id } = resolvedParams;
 
