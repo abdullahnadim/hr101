@@ -116,8 +116,8 @@ model Employee {
   customData           Json?
   joiningDate          DateTime
   status               String         @default("ACTIVE") 
-  bloodGroup    String? 
-  gender        String?  
+  bloodGroup           String? 
+  gender               String?  
 
   // Payroll & Transport Constants
   baseSalary           Float          @default(0)
@@ -135,12 +135,13 @@ model Employee {
   leaveRequests        LeaveRequest[]
   roomBookings         RoomBooking[]
   itAssets             ITAsset[]
+  assetLogs            ITAssetAssignmentLog[] // NEW: History Logger Relation
   payrolls             Payroll[]
   loans                Loan[]
   attendances          Attendance[]
 
   // Reception 
-  receptionBills  ReceptionBill[]
+  receptionBills       ReceptionBill[]
   
   createdAt            DateTime       @default(now())
   updatedAt            DateTime       @updatedAt
@@ -149,7 +150,68 @@ model Employee {
 }
 
 // ==========================================
-// 4. RECRUITMENT (ATS)
+// 4. RECEPTION & VENDORS
+// ==========================================
+
+model Vendor {
+  id            String          @id @default(cuid())
+  orgId         String?         // Optional for global vendors, required for org-specific
+  organization  Organization?   @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name          String
+  contactPerson String?
+  email         String?
+  phone         String?
+  address       String?
+  bills         ReceptionBill[]
+  
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  
+  @@index([orgId])
+}
+
+model ReceptionBill {
+  id              String       @id @default(cuid())
+  orgId           String
+  organization    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  
+  systemSerialNo  String       @unique 
+  billNumber      String?      
+  billDate        DateTime     @db.Date
+  entryAt         DateTime     @default(now()) 
+  
+  category        String       
+  amount          Float
+  department      String?      
+  description     String?      @db.Text 
+  
+  status          String       @default("DRAFT") 
+  discrepancyNote String?      @db.Text
+
+  accountsReceivedAt DateTime?
+  auditReceivedAt    DateTime?
+  approvedAt         DateTime?
+  disbursedAt        DateTime?
+  
+  vendorId        String
+  vendor          Vendor       @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  
+  recordedById    String?
+  recordedBy      Employee?    @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@index([orgId])
+  @@index([systemSerialNo])
+  @@index([vendorId])
+  @@index([recordedById])
+  @@index([status])
+}
+
+
+// ==========================================
+// 5. RECRUITMENT (ATS)
 // ==========================================
 
 model Candidate {
@@ -201,7 +263,7 @@ model Interview {
 }
 
 // ==========================================
-// 5. LEAVE MANAGEMENT
+// 6. LEAVE MANAGEMENT
 // ==========================================
 
 model LeavePolicy {
@@ -233,12 +295,12 @@ model LeaveRequest {
   policyId      String
   policy        LeavePolicy @relation(fields: [policyId], references: [id], onDelete: Cascade)
   
-  leaveType     String?     // Optional fallback if needed beyond policy naming
+  leaveType     String?     
   startDate     DateTime    @db.Date
   endDate       DateTime    @db.Date
   totalDays     Float       @default(0)
   reason        String?
-  status        String      @default("PENDING") // PENDING, APPROVED, REJECTED
+  status        String      @default("PENDING") 
   reviewerNotes String?
   
   createdAt     DateTime    @default(now())
@@ -249,7 +311,7 @@ model LeaveRequest {
 }
 
 // ==========================================
-// 6. IT ASSETS & SPACES
+// 7. IT ASSETS & SPACES
 // ==========================================
 
 model ITAsset {
@@ -271,11 +333,33 @@ model ITAsset {
   assignedTo   Employee? @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
   notes        String?
   
+  // NEW: Relation for the History Logger
+  assignmentLogs ITAssetAssignmentLog[]
+
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
   @@index([orgId])
   @@index([assignedToId])
+}
+
+// NEW: History Logger Model for IT Assets
+model ITAssetAssignmentLog {
+  id           String    @id @default(cuid())
+  
+  assetId      String
+  asset        ITAsset   @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  
+  employeeId   String?
+  employee     Employee? @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  
+  action       String    // "ASSIGNED", "RETURNED", "MAINTENANCE"
+  notes        String?   @db.Text
+  
+  performedAt  DateTime  @default(now())
+
+  @@index([assetId])
+  @@index([employeeId])
 }
 
 model Room {
@@ -322,7 +406,7 @@ model RoomBooking {
 }
 
 // ==========================================
-// 7. PAYROLL & FINANCE
+// 8. PAYROLL & FINANCE
 // ==========================================
 
 model PayrollSettings {
@@ -403,7 +487,7 @@ model Loan {
 }
 
 // ==========================================
-// 8. LOGS & TRACKING
+// 9. LOGS & TRACKING
 // ==========================================
 
 model Attendance {
@@ -431,7 +515,7 @@ model MessageTemplate {
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   
   name         String
-  channel      String       
+  channel      String        
   subject      String?      
   body         String
   isActive     Boolean      @default(true)
@@ -465,78 +549,4 @@ model AuditLog {
   timestamp DateTime @default(now())
 
   @@index([userId])
-}
-
-// ==========================================
-// 9. RECEPTION & VENDORS
-// ==========================================
-
-model Vendor {
-  id           String          @id @default(cuid())
-  orgId        String
-  organization Organization    @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  
-  name         String
-  phone        String?
-  email        String?
-  address      String?
-  status       String          @default("ACTIVE")
-  
-  bills        ReceptionBill[]
-  
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  
-  @@index([orgId])
-}
-
-model ReceptionBill {
-  id              String       @id @default(cuid())
-  orgId           String
-  organization    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
-  
-  // Auto-generated system sequence (e.g., FAL-Bill-2026-0001)
-  systemSerialNo  String       @unique 
-  
-  // Manual Invoice/Bill Number printed on the physical document
-  billNumber      String?      
-  
-  // The actual date printed on the vendor's physical invoice
-  billDate        DateTime     @db.Date
-  
-  // Auto-captured when the receptionist clicks "Save"
-  entryAt         DateTime     @default(now()) 
-  
-  // Financial Details
-  category        String       // Supplier/party bill, Salary, Overtime, Incentive, Other
-  amount          Float
-  department      String?      // Target department for the bill
-  description     String?      @db.Text // Brief Description / Purpose
-  
-  // Workflow Status Tracking
-  status          String       @default("DRAFT") // DRAFT, SENT_TO_ACCOUNTS, DISCREPANCY, SENT_TO_AUDIT, APPROVED_FOR_DISBURSEMENT
-  discrepancyNote String?      @db.Text
-
-  // Workflow Timestamp Tracking
-  accountsReceivedAt DateTime?
-  auditReceivedAt    DateTime?
-  approvedAt         DateTime?
-  disbursedAt        DateTime?
-  
-  // Relational connection to Vendor
-  vendorId        String
-  vendor          Vendor       @relation(fields: [vendorId], references: [id], onDelete: Restrict)
-  
-  // Track which receptionist entered the bill
-  recordedById    String?
-  recordedBy      Employee?    @relation(fields: [recordedById], references: [id], onDelete: SetNull)
-
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-
-  @@index([orgId])
-  @@index([systemSerialNo])
-  @@index([vendorId])
-  @@index([recordedById])
-  @@index([status])
 }
