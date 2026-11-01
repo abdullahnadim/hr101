@@ -13,7 +13,7 @@ import {
   // Payroll & Finance
   Wallet, FileSpreadsheet, FileUp, Receipt,
   // Admin & IT
-  Monitor, ShieldCheck, ConciergeBell, CalendarClock,
+  Monitor, ShieldCheck, ConciergeBell, CalendarClock, Activity,
   // System
   Settings, LogIn, LogOut, Menu, X, ChevronDown, UserCircle
 } from "lucide-react";
@@ -123,9 +123,10 @@ export function AppNavigation({ children }: { children: React.ReactNode }) {
           
           {canViewHR && (
             <NavGroup title="Human Resources" icon={Users} basePath="/hr" pathname={pathname}>
+              {/* NEW: Added the HR Command Center Hub */}
+              <Link onClick={closeMobile} href="/hr" className={subLinkClass('/hr')}><Activity size={14} /> Command Center</Link>
               <Link onClick={closeMobile} href="/hr/employees" className={subLinkClass('/hr/employees')}><Contact2 size={14} /> Directory</Link>
               <Link onClick={closeMobile} href="/hr/leaves" className={subLinkClass('/hr/leaves')}><Palmtree size={14} /> Leaves</Link>
-              {/* NEW: Room Admin moved to HR */}
               <Link onClick={closeMobile} href="/hr/conference" className={subLinkClass('/hr/conference')}><CalendarClock size={14} /> Room Admin</Link>
             </NavGroup>
           )}
@@ -264,7 +265,7 @@ export function AppNavigation({ children }: { children: React.ReactNode }) {
             <span className={`text-[10px] ${pathname.startsWith('/recruitment') ? 'font-bold' : 'font-medium'}`}>ATS</span>
           </Link>
         ) : isAuthenticated && canViewHR ? (
-          <Link href="/hr/employees" className={`flex flex-col items-center gap-1.5 p-2 w-16 transition-all duration-200 ${pathname.startsWith('/hr') ? 'text-blue-600 scale-105' : 'text-neutral-400 hover:text-neutral-600'}`}>
+          <Link href="/hr" className={`flex flex-col items-center gap-1.5 p-2 w-16 transition-all duration-200 ${pathname.startsWith('/hr') ? 'text-blue-600 scale-105' : 'text-neutral-400 hover:text-neutral-600'}`}>
             <Users size={22} className={pathname.startsWith('/hr') ? 'fill-blue-50' : ''} />
             <span className={`text-[10px] ${pathname.startsWith('/hr') ? 'font-bold' : 'font-medium'}`}>HR</span>
           </Link>
