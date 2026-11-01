@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   Laptop, Monitor, Search, Plus, UserCheck, 
   History, AlertTriangle, CheckCircle, Loader2, Users,
-  Cpu, Printer, Phone, Video, Battery, Mouse, Wrench, Trash2, Download
+  Cpu, Printer, Phone, Video, Battery, Mouse, Wrench, Trash2, Download, User
 } from 'lucide-react';
 
 const ASSET_CATEGORIES = [
@@ -15,6 +15,7 @@ const ASSET_CATEGORIES = [
 
 export default function ITAssetsDashboard() {
   const [assets, setAssets] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -28,19 +29,28 @@ export default function ITAssetsDashboard() {
   const [assetHistory, setAssetHistory] = useState<any[]>([]);
 
   // Forms
-  const [assetForm, setAssetForm] = useState({ name: '', category: 'Laptop', serialNumber: '', condition: 'GOOD', location: '', ipAddress: '', notes: '', assignedToId: '' });
+  const defaultAssetForm = { 
+    name: '', category: 'Laptop', serialNumber: '', condition: 'GOOD', 
+    location: '', ipAddress: '', notes: '', assignedToId: '',
+    specs: { processor: '', ram: '', storage: '' }
+  };
+  const [assetForm, setAssetForm] = useState(defaultAssetForm);
   const [assignForm, setAssignForm] = useState({ employeeId: '', notes: '' });
 
-  // Autocomplete for Assigning
+  // Autocomplete for Standalone Assign Modal
   const [empSearchQuery, setEmpSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const fetchAssets = async () => {
+  const fetchData = async () => {
     try {
-      const res = await fetch('/api/it/assets');
-      if (res.ok) setAssets(await res.json());
+      const [assetsRes, empRes] = await Promise.all([
+        fetch('/api/it/assets'),
+        fetch('/api/employees')
+      ]);
+      if (assetsRes.ok) setAssets(await assetsRes.json());
+      if (empRes.ok) setEmployees(await empRes.json());
     } catch (e) {
       console.error(e);
     } finally {
@@ -49,7 +59,7 @@ export default function ITAssetsDashboard() {
   };
 
   useEffect(() => {
-    fetchAssets();
+    fetchData();
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) setShowDropdown(false);
     };
@@ -57,30 +67,20 @@ export default function ITAssetsDashboard() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Employee Autocomplete Logic
+  // Employee Autocomplete Logic for Standalone Assign Modal
   useEffect(() => {
     if (empSearchQuery.length < 2) {
       setSuggestions([]);
       setShowDropdown(false);
       return;
     }
-    const fetchSuggestions = async () => {
-      try {
-        const res = await fetch('/api/employees');
-        if (res.ok) {
-          const data = await res.json();
-          const filtered = data.filter((emp: any) => 
-            emp.employeeCode?.toLowerCase().includes(empSearchQuery.toLowerCase()) || 
-            emp.name?.toLowerCase().includes(empSearchQuery.toLowerCase())
-          );
-          setSuggestions(filtered.slice(0, 5));
-          setShowDropdown(true);
-        }
-      } catch (error) {}
-    };
-    const debounce = setTimeout(fetchSuggestions, 300);
-    return () => clearTimeout(debounce);
-  }, [empSearchQuery]);
+    const filtered = employees.filter((emp: any) => 
+      emp.employeeCode?.toLowerCase().includes(empSearchQuery.toLowerCase()) || 
+      emp.name?.toLowerCase().includes(empSearchQuery.toLowerCase())
+    );
+    setSuggestions(filtered.slice(0, 5));
+    setShowDropdown(true);
+  }, [empSearchQuery, employees]);
 
   const handleCreateAsset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -88,6 +88,7 @@ export default function ITAssetsDashboard() {
     
     const payload = { ...assetForm };
     if (payload.assignedToId) payload.status = 'ASSIGNED';
+    else payload.status = 'AVAILABLE';
     
     try {
       const res = await fetch('/api/it/assets', {
@@ -96,9 +97,9 @@ export default function ITAssetsDashboard() {
         body: JSON.stringify(payload)
       });
       if (res.ok) {
-        fetchAssets();
+        fetchData(); // Refresh list
         setIsAssetModalOpen(false);
-        setAssetForm({ name: '', category: 'Laptop', serialNumber: '', condition: 'GOOD', location: '', ipAddress: '', notes: '', assignedToId: '' });
+        setAssetForm(defaultAssetForm);
       } else {
         alert("Failed to create asset.");
       }
@@ -116,7 +117,7 @@ export default function ITAssetsDashboard() {
         body: JSON.stringify(assignForm)
       });
       if (res.ok) {
-        fetchAssets();
+        fetchData();
         setIsAssignModalOpen(false);
       } else {
         alert("Failed to assign asset.");
@@ -131,9 +132,9 @@ export default function ITAssetsDashboard() {
       const res = await fetch(`/api/it/assets/${assetId}/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'RETURN' })
+        body: JSON.stringify({ action: 'RETURN', notes: 'Returned to storage.' })
       });
-      if (res.ok) fetchAssets();
+      if (res.ok) fetchData();
     } catch (err) { alert("Network error"); }
   };
   
@@ -141,7 +142,7 @@ export default function ITAssetsDashboard() {
     if (!confirm('Permanently delete this asset and its entire history?')) return;
     try {
       const res = await fetch(`/api/it/assets/${id}`, { method: 'DELETE' });
-      if (res.ok) fetchAssets();
+      if (res.ok) fetchData();
       else alert("Failed to delete. Check permissions.");
     } catch (error) { alert("Network error."); }
   };
@@ -163,168 +164,229 @@ export default function ITAssetsDashboard() {
 
   const filteredAssets = assets.filter(a => 
     a.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    a.serialNumber?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    a.assignedTo?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+    (a.serialNumber && a.serialNumber.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (a.assignedTo && a.assignedTo.name.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6 pb-24 animate-in fade-in duration-300">
-      
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-xl border border-neutral-200 shadow-sm gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-neutral-900 flex items-center gap-2">
-            <Laptop className="text-blue-600" /> IT Assets Hub
-          </h1>
-          <p className="text-sm text-neutral-500 mt-1">Manage hardware inventory, assignments, and lifecycle tracking.</p>
-        </div>
-        <button onClick={() => setIsAssetModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 bg-black text-white text-sm font-bold rounded-lg hover:bg-neutral-800 transition-colors shadow-sm">
-          <Plus size={16} /> New Asset
-        </button>
-      </header>
-
-      {/* Dashboard Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-xl border border-neutral-200 shadow-sm">
-          <p className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Total Assets</p>
-          <p className="text-2xl font-black text-neutral-900 mt-1">{assets.length}</p>
-        </div>
-        <div className="bg-white p-5 rounded-xl border border-emerald-100 bg-emerald-50/30 shadow-sm">
-          <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">In Storage</p>
-          <p className="text-2xl font-black text-emerald-700 mt-1">{assets.filter(a => a.status === 'AVAILABLE').length}</p>
-        </div>
-        <div className="bg-white p-5 rounded-xl border border-blue-100 bg-blue-50/30 shadow-sm">
-          <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">Assigned</p>
-          <p className="text-2xl font-black text-blue-700 mt-1">{assets.filter(a => a.status === 'ASSIGNED').length}</p>
-        </div>
-        <div className="bg-white p-5 rounded-xl border border-amber-100 bg-amber-50/30 shadow-sm">
-          <p className="text-xs font-bold text-amber-600 uppercase tracking-wider">Maintenance</p>
-          <p className="text-2xl font-black text-amber-700 mt-1">{assets.filter(a => a.status === 'MAINTENANCE').length}</p>
-        </div>
-      </div>
-
-      {/* Main Table */}
-      <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden min-h-[500px] flex flex-col">
-        <div className="p-4 border-b border-neutral-100 bg-neutral-50">
-          <div className="relative w-full max-w-md">
-            <Search className="absolute left-3 top-2.5 text-neutral-400" size={16} />
-            <input type="text" placeholder="Search asset, serial, or employee..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-neutral-200 rounded-lg text-sm outline-none focus:border-black transition-shadow bg-white" />
+    <main className="flex-1 flex flex-col h-full overflow-y-auto pb-20 md:pb-0 relative">
+      <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8 pb-24">
+        
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-neutral-900 tracking-tight">IT Asset Management</h1>
+            <p className="text-neutral-500 mt-1">Track hardware inventory, specs, and employee network configurations.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button className="flex items-center gap-2 px-4 py-2.5 bg-white border border-neutral-200 text-neutral-700 text-sm font-bold rounded-lg hover:bg-neutral-50 transition-colors shadow-sm">
+              <Download size={16} /> Export CSV
+            </button>
+            <button onClick={() => setIsAssetModalOpen(true)} className="flex items-center gap-2 px-5 py-2.5 bg-black text-white text-sm font-bold rounded-lg hover:bg-neutral-800 transition-colors shadow-sm">
+              <Plus size={16} /> Register Asset
+            </button>
           </div>
         </div>
 
-        <div className="overflow-x-auto flex-1">
-          {loading ? (
-            <div className="h-64 flex items-center justify-center"><Loader2 className="animate-spin text-neutral-400" size={24} /></div>
-          ) : filteredAssets.length === 0 ? (
-            <div className="h-64 flex flex-col items-center justify-center text-neutral-400">
-              <Cpu size={32} className="mb-2 opacity-50" />
-              <p className="text-sm font-medium">No assets found</p>
+        {/* Dashboard Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm">
+            <p className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Total Inventory</p>
+            <h2 className="text-2xl font-black text-neutral-900 mt-1">{assets.length}</h2>
+          </div>
+          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm">
+            <p className="text-xs font-bold text-emerald-600 uppercase tracking-wider">Available Storage</p>
+            <h2 className="text-2xl font-black text-neutral-900 mt-1">{assets.filter(a => a.status === 'AVAILABLE').length}</h2>
+          </div>
+          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm">
+            <p className="text-xs font-bold text-blue-600 uppercase tracking-wider">Currently Assigned</p>
+            <h2 className="text-2xl font-black text-neutral-900 mt-1">{assets.filter(a => a.status === 'ASSIGNED').length}</h2>
+          </div>
+          <div className="bg-white p-5 rounded-2xl border border-neutral-200 shadow-sm">
+            <p className="text-xs font-bold text-red-500 uppercase tracking-wider">Needs Maintenance</p>
+            <h2 className="text-2xl font-black text-neutral-900 mt-1">{assets.filter(a => a.status === 'MAINTENANCE').length}</h2>
+          </div>
+        </div>
+
+        {/* Main Table */}
+        <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden flex flex-col h-[600px]">
+          <div className="p-4 border-b border-neutral-100 bg-neutral-50/50 flex flex-col sm:flex-row gap-4 justify-between items-center">
+            <div className="relative w-full sm:w-80">
+              <Search className="absolute left-3 top-2.5 text-neutral-400" size={16} />
+              <input type="text" placeholder="Search by model, serial, or user..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:border-black transition-colors" />
             </div>
-          ) : (
-            <table className="w-full text-sm text-left whitespace-nowrap">
-              <thead className="bg-neutral-50 text-[11px] uppercase font-bold text-neutral-500 border-b border-neutral-200">
-                <tr>
-                  <th className="px-6 py-4">Asset Details</th>
-                  <th className="px-6 py-4">Serial No.</th>
-                  <th className="px-6 py-4">Current Assignment</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100">
-                {filteredAssets.map(asset => {
-                  const Icon = getCategoryIcon(asset.category);
-                  return (
-                    <tr key={asset.id} className="hover:bg-neutral-50/50">
-                      <td className="px-6 py-4">
-                        <div className="font-bold text-neutral-900 flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-white border border-neutral-200 flex items-center justify-center text-neutral-600 shrink-0 shadow-sm">
-                            <Icon size={14} />
+          </div>
+
+          <div className="flex-1 overflow-auto">
+            {loading ? (
+              <div className="h-full flex items-center justify-center"><Loader2 className="animate-spin text-neutral-400" size={24} /></div>
+            ) : filteredAssets.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-neutral-500 py-12">
+                <Monitor size={48} className="text-neutral-200 mb-4" />
+                <p>No IT assets found matching your criteria.</p>
+              </div>
+            ) : (
+              // Removed whitespace-nowrap here so the text drops to a new line gracefully!
+              <table className="w-full text-sm text-left">
+                <thead className="bg-neutral-50 text-[11px] uppercase font-bold text-neutral-500 border-b border-neutral-200 sticky top-0 z-10">
+                  <tr>
+                    <th className="px-6 py-4">Asset & Specs</th>
+                    <th className="px-6 py-4">Serial No & IP</th>
+                    <th className="px-6 py-4">Current Assignment</th>
+                    <th className="px-6 py-4">Status</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-neutral-100">
+                  {filteredAssets.map(asset => {
+                    const Icon = getCategoryIcon(asset.category);
+                    return (
+                      <tr key={asset.id} className="hover:bg-neutral-50/50">
+                        <td className="px-6 py-4 min-w-[250px]">
+                          <div className="font-bold text-neutral-900 flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-white border border-neutral-200 flex items-center justify-center text-neutral-600 shrink-0 shadow-sm mt-0.5">
+                              <Icon size={14} />
+                            </div>
+                            <div>
+                              <div>{asset.name}</div>
+                              <div className="text-[10px] text-neutral-500 mt-1 tracking-wide font-normal leading-tight">
+                                {asset.specs?.processor && <>{asset.specs.processor} <br/></>} 
+                                {asset.specs?.ram && <>{asset.specs.ram} | </>} 
+                                {asset.specs?.storage && <>{asset.specs.storage}</>}
+                              </div>
+                            </div>
                           </div>
-                          {asset.name}
-                        </div>
-                        <div className="text-[10px] text-neutral-500 uppercase mt-1 pl-10 tracking-wider font-bold">{asset.category}</div>
-                      </td>
-                      <td className="px-6 py-4 font-mono text-neutral-600">{asset.serialNumber || 'N/A'}</td>
-                      <td className="px-6 py-4">
-                        {asset.assignedTo ? (
-                          <div>
-                            <div className="font-bold text-neutral-900">{asset.assignedTo.name}</div>
-                            <div className="text-[10px] text-neutral-500 font-mono mt-0.5">{asset.assignedTo.employeeCode}</div>
-                          </div>
-                        ) : (
-                          <span className="text-neutral-400 text-xs italic">Unassigned (In IT Store)</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                          asset.status === 'AVAILABLE' ? 'bg-emerald-50 text-emerald-700' :
-                          asset.status === 'ASSIGNED' ? 'bg-blue-50 text-blue-700' :
-                          'bg-amber-50 text-amber-700'
-                        }`}>
-                          {asset.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex justify-end gap-2">
-                          {asset.status === 'AVAILABLE' ? (
-                            <button onClick={() => { setSelectedAsset(asset); setIsAssignModalOpen(true); setEmpSearchQuery(''); setAssignForm({employeeId: '', notes: ''}); }} className="px-3 py-1.5 bg-black text-white text-xs font-bold rounded-lg hover:bg-neutral-800 transition-colors shadow-sm flex items-center gap-1.5">
-                              <UserCheck size={14} /> Assign
-                            </button>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="font-mono text-neutral-900">{asset.serialNumber || 'N/A'}</div>
+                          {asset.ipAddress && <div className="text-[10px] font-mono text-blue-600 mt-0.5">{asset.ipAddress}</div>}
+                        </td>
+                        <td className="px-6 py-4 min-w-[180px]">
+                          {asset.assignedTo ? (
+                            <div>
+                              <div className="font-bold text-neutral-900 flex items-center gap-1.5"><User size={12}/> {asset.assignedTo.name}</div>
+                              <div className="text-[10px] text-neutral-500 font-mono mt-0.5">{asset.assignedTo.employeeCode} - {asset.assignedTo.department}</div>
+                            </div>
                           ) : (
-                            <button onClick={() => handleReturnAsset(asset.id)} className="px-3 py-1.5 bg-neutral-100 text-neutral-700 text-xs font-bold rounded-lg hover:bg-neutral-200 transition-colors flex items-center gap-1.5 border border-neutral-200">
-                              Return
-                            </button>
+                            <span className="text-neutral-400 text-xs italic flex items-center gap-1.5"><Wrench size={12}/> In IT Store</span>
                           )}
-                          <button onClick={() => openHistory(asset)} className="px-2 py-1.5 text-neutral-500 hover:text-blue-600 border border-neutral-200 rounded-lg hover:bg-blue-50 transition-colors" title="View History Logs">
-                            <History size={16} />
-                          </button>
-                          <button onClick={() => handleDelete(asset.id)} className="px-2 py-1.5 text-neutral-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors ml-1" title="Delete">
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                            asset.status === 'AVAILABLE' ? 'bg-emerald-50 text-emerald-700' :
+                            asset.status === 'ASSIGNED' ? 'bg-blue-50 text-blue-700' :
+                            'bg-amber-50 text-amber-700'
+                          }`}>
+                            {asset.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right min-w-[150px]">
+                          <div className="flex justify-end gap-2">
+                            {asset.status === 'AVAILABLE' ? (
+                              <button onClick={() => { setSelectedAsset(asset); setIsAssignModalOpen(true); setEmpSearchQuery(''); setAssignForm({employeeId: '', notes: ''}); }} className="px-3 py-1.5 bg-black text-white text-xs font-bold rounded-lg hover:bg-neutral-800 transition-colors shadow-sm flex items-center gap-1.5">
+                                <UserCheck size={14} /> Assign
+                              </button>
+                            ) : (
+                              <button onClick={() => handleReturnAsset(asset.id)} className="px-3 py-1.5 bg-neutral-100 text-neutral-700 text-xs font-bold rounded-lg hover:bg-neutral-200 transition-colors flex items-center gap-1.5 border border-neutral-200">
+                                Return
+                              </button>
+                            )}
+                            <button onClick={() => openHistory(asset)} className="px-2 py-1.5 text-neutral-500 hover:text-blue-600 border border-neutral-200 rounded-lg hover:bg-blue-50 transition-colors" title="View Service History">
+                              <History size={16} />
+                            </button>
+                            <button onClick={() => handleDelete(asset.id)} className="px-2 py-1.5 text-neutral-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors ml-1" title="Delete">
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
         </div>
       </div>
 
       {/* --- ADD NEW ASSET MODAL --- */}
       {isAssetModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-              <Plus className="text-blue-600"/> Register New Asset
-            </h2>
-            <form onSubmit={handleCreateAsset} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider mb-1">Asset Name / Model *</label>
-                <input required type="text" value={assetForm.name} onChange={e => setAssetForm({...assetForm, name: e.target.value})} className="w-full p-2.5 border rounded-lg text-sm outline-none focus:border-black" placeholder="e.g. MacBook Pro M2" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider mb-1">Category *</label>
-                  <select required value={assetForm.category} onChange={e => setAssetForm({...assetForm, category: e.target.value})} className="w-full p-2.5 border rounded-lg text-sm bg-white outline-none focus:border-black">
-                    {ASSET_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.id}</option>)}
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <form onSubmit={handleCreateAsset} className="flex flex-col h-full">
+              <div className="p-6 overflow-y-auto space-y-6">
+                
+                <h2 className="text-xl font-bold mb-2 flex items-center gap-2">
+                  <Plus className="text-blue-600"/> Register New Asset
+                </h2>
+
+                {/* DIRECT ASSIGNMENT DROPDOWN */}
+                <div className="p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
+                  <label className="block text-xs font-bold text-blue-900 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <User size={14}/> Assign to Employee (Optional)
+                  </label>
+                  <select value={assetForm.assignedToId} onChange={e => setAssetForm({...assetForm, assignedToId: e.target.value})} className="w-full p-2.5 border border-blue-200 rounded-lg outline-none focus:border-blue-500 text-sm bg-white font-medium">
+                    <option value="">-- Unassigned (Keep in Storage) --</option>
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.id}>{emp.name} ({emp.department} - {emp.employeeCode})</option>
+                    ))}
                   </select>
+                  <p className="text-[10px] text-blue-600 mt-2 font-medium">Asset status will automatically update to 'ASSIGNED' if selected.</p>
                 </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider mb-1">Condition</label>
-                  <select required value={assetForm.condition} onChange={e => setAssetForm({...assetForm, condition: e.target.value})} className="w-full p-2.5 border rounded-lg text-sm bg-white outline-none focus:border-black">
-                    <option>NEW</option><option>GOOD</option><option>FAIR</option>
-                  </select>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Brand / Model *</label>
+                    <input required type="text" value={assetForm.name} onChange={e => setAssetForm({...assetForm, name: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm outline-none focus:border-black" placeholder="e.g. HP EliteBook 840 G6" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Serial No *</label>
+                    <input required type="text" value={assetForm.serialNumber} onChange={e => setAssetForm({...assetForm, serialNumber: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm outline-none focus:border-black font-mono" placeholder="e.g. FAL/HO/IT/LP02" />
+                  </div>
                 </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Category</label>
+                    <select value={assetForm.category} onChange={e => setAssetForm({...assetForm, category: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm outline-none focus:border-black bg-white">
+                      {ASSET_CATEGORIES.map(c => <option key={c.id} value={c.id}>{c.id.replace('_', ' ')}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Location</label>
+                    <input type="text" value={assetForm.location} onChange={e => setAssetForm({...assetForm, location: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm outline-none focus:border-black" placeholder="e.g. HR Room / Reception" />
+                  </div>
+                </div>
+
+                <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-100 grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Processor</label>
+                    <input type="text" value={assetForm.specs.processor} onChange={e => setAssetForm({...assetForm, specs: {...assetForm.specs, processor: e.target.value}})} className="w-full p-2 border border-neutral-200 rounded text-sm outline-none focus:border-black" placeholder="Core i3 10th Gen" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">RAM</label>
+                    <input type="text" value={assetForm.specs.ram} onChange={e => setAssetForm({...assetForm, specs: {...assetForm.specs, ram: e.target.value}})} className="w-full p-2 border border-neutral-200 rounded text-sm outline-none focus:border-black" placeholder="12GB" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Storage</label>
+                    <input type="text" value={assetForm.specs.storage} onChange={e => setAssetForm({...assetForm, specs: {...assetForm.specs, storage: e.target.value}})} className="w-full p-2 border border-neutral-200 rounded text-sm outline-none focus:border-black" placeholder="SSD: 120GB, HDD: 1TB" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Static IP Address</label>
+                    <input type="text" value={assetForm.ipAddress} onChange={e => setAssetForm({...assetForm, ipAddress: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm outline-none focus:border-black font-mono" placeholder="e.g. 192.168.102.211" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Internal Notes</label>
+                    <input type="text" value={assetForm.notes} onChange={e => setAssetForm({...assetForm, notes: e.target.value})} className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm outline-none focus:border-black" placeholder="Optional details..." />
+                  </div>
+                </div>
+
               </div>
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider mb-1">Serial Number</label>
-                <input type="text" value={assetForm.serialNumber} onChange={e => setAssetForm({...assetForm, serialNumber: e.target.value})} className="w-full p-2.5 border rounded-lg text-sm font-mono outline-none focus:border-black" placeholder="SN-123456" />
-              </div>
-              <div className="flex justify-end gap-3 pt-4 border-t border-neutral-100">
-                <button type="button" onClick={() => setIsAssetModalOpen(false)} className="px-4 py-2.5 text-sm font-bold text-neutral-600 hover:bg-neutral-100 rounded-lg">Cancel</button>
-                <button type="submit" disabled={submitting} className="px-5 py-2.5 bg-black text-white text-sm font-bold rounded-lg flex items-center gap-2">
+              <div className="flex justify-end gap-3 p-6 border-t border-neutral-100 bg-neutral-50/50 mt-auto">
+                <button type="button" onClick={() => setIsAssetModalOpen(false)} className="px-4 py-2.5 text-sm font-bold text-neutral-600 hover:bg-neutral-200 rounded-lg transition-colors">Cancel</button>
+                <button type="submit" disabled={submitting} className="px-5 py-2.5 bg-black text-white text-sm font-bold rounded-lg hover:bg-neutral-800 disabled:opacity-50 flex items-center gap-2">
                   {submitting && <Loader2 size={14} className="animate-spin"/>} Save Asset
                 </button>
               </div>
@@ -379,17 +441,17 @@ export default function ITAssetsDashboard() {
         </div>
       )}
 
-      {/* --- HISTORY LOGGER MODAL --- */}
+      {/* --- SERVICE HISTORY MODAL --- */}
       {isHistoryModalOpen && (
         <div className="fixed inset-0 z-50 flex justify-end bg-neutral-900/60 backdrop-blur-sm">
           <div className="bg-white w-full max-w-md h-full shadow-2xl p-6 overflow-y-auto animate-in slide-in-from-right-full duration-300 border-l">
             <div className="flex justify-between items-start border-b border-neutral-100 pb-4 mb-6">
               <div>
-                <h2 className="text-xl font-bold text-neutral-900 flex items-center gap-2"><History className="text-blue-600"/> Asset History</h2>
+                <h2 className="text-xl font-bold text-neutral-900 flex items-center gap-2"><History className="text-blue-600"/> Service History</h2>
                 <p className="text-xs font-bold text-neutral-500 mt-1 uppercase tracking-wider">{selectedAsset?.name}</p>
                 <p className="text-[10px] font-mono text-neutral-400">{selectedAsset?.serialNumber}</p>
               </div>
-              <button onClick={() => setIsHistoryModalOpen(false)} className="p-2 hover:bg-neutral-100 rounded-full bg-neutral-50"><X size={18} /></button>
+              <button onClick={() => setIsHistoryModalOpen(false)} className="p-2 hover:bg-neutral-100 rounded-full bg-neutral-50">✕</button>
             </div>
 
             <div className="space-y-0">
@@ -397,7 +459,7 @@ export default function ITAssetsDashboard() {
                 <div className="text-center py-10 text-neutral-400">
                   <History size={32} className="mx-auto mb-3 opacity-20"/>
                   <p className="font-bold text-neutral-600">No History Available</p>
-                  <p className="text-xs mt-1">This asset has never been assigned.</p>
+                  <p className="text-xs mt-1">This asset has no recorded events.</p>
                 </div>
               ) : (
                 assetHistory.map((log, i) => (
@@ -431,6 +493,6 @@ export default function ITAssetsDashboard() {
         </div>
       )}
 
-    </div>
+    </main>
   );
 }

@@ -13,6 +13,9 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSuccess
   
   const { positions, departments, employmentTypes, employeeFields } = useSettingsStore();
 
+  const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  const genders = ['Male', 'Female', 'Other'];
+
   let parsedData: any[] = [];
   try {
     const rawData = employee?.customData || employee?.notes; 
@@ -70,23 +73,27 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSuccess
 
     const formattedData = {
       name: data.name,
+      employeeCode: data.employeeCode,
       email: data.email,
       phone: data.phone,
       position: data.position,
       department: data.department,
+      gender: data.gender,
+      bloodGroup: data.bloodGroup,
+      dateOfBirth: data.dateOfBirth ? new Date(data.dateOfBirth as string).toISOString() : null,
+      joiningDate: data.joinDate ? new Date(data.joinDate as string).toISOString() : employee.joiningDate,
       status: data.status,
-      joinDate: data.joinDate,
       
       // Included Payroll & Compensation Fields
-      baseSalary: data.baseSalary,
-      increment: data.increment,
-      taxPercentage: data.taxPercentage,
-      taxAmount: data.taxAmount,
-      allowance: data.allowance,
-      transportAllowance: data.transportAllowance,
-      mobileBillLimit: data.mobileBillLimit,
+      baseSalary: parseFloat(data.baseSalary as string) || 0,
+      increment: parseFloat(data.increment as string) || 0,
+      taxPercentage: parseFloat(data.taxPercentage as string) || 0,
+      taxAmount: parseFloat(data.taxAmount as string) || 0,
+      allowance: parseFloat(data.allowance as string) || 0,
+      transportAllowance: parseFloat(data.transportAllowance as string) || 0,
+      mobileBillLimit: parseFloat(data.mobileBillLimit as string) || 0,
       usesCompanyTransport: usesTransport,
-      transportRouteFare: data.transportRouteFare,
+      transportRouteFare: parseFloat(data.transportRouteFare as string) || 0,
 
       customData: extractedDynamicFields.length > 0 ? JSON.stringify(extractedDynamicFields) : null
     };
@@ -107,12 +114,13 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSuccess
   };
 
   const defaultEmploymentType = getCustomFieldValue('Employment Type') || 'Regular Employee';
-  const defaultJoinDate = employee.joinDate ? new Date(employee.joinDate).toISOString().split('T')[0] : '';
+  const defaultJoinDate = employee.joiningDate ? new Date(employee.joiningDate).toISOString().split('T')[0] : '';
+  const defaultDobDate = employee.dateOfBirth ? new Date(employee.dateOfBirth).toISOString().split('T')[0] : '';
   const defaultJobId = getCustomFieldValue('Job ID');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4">
-      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-white w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center px-6 py-5 border-b border-neutral-100 bg-neutral-50/50 flex-shrink-0">
           <div>
             <h2 className="font-semibold text-lg text-neutral-900">Manage Profile & Compensation</h2>
@@ -123,7 +131,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSuccess
           </button>
         </div>
         
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-8">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
           
           <div className="space-y-6">
             <h3 className="text-sm font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-2 border-b border-neutral-100 pb-2">
@@ -151,61 +159,78 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSuccess
               </div>
             </div>
 
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Full Name *</label>
                 <input required name="name" defaultValue={employee.name} type="text" className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black outline-none" />
               </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Email *</label>
-                  <input required name="email" defaultValue={employee.email} type="email" className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black outline-none" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Phone *</label>
-                  <input required name="phone" defaultValue={employee.phone} type="text" className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black outline-none" />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Position *</label>
-                  <input required name="position" defaultValue={employee.position} list="positions-list" autoComplete="off" className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black outline-none" />
-                  <datalist id="positions-list">
-                    {positions?.map(pos => <option key={pos} value={pos} />)}
-                  </datalist>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Department *</label>
-                  <input required name="department" defaultValue={employee.department} list="departments-list" autoComplete="off" className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black outline-none" />
-                  <datalist id="departments-list">
-                    {departments?.map(dept => <option key={dept} value={dept} />)}
-                  </datalist>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Employment Type</label>
-                  <select name="employmentType" defaultValue={defaultEmploymentType} className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-black text-sm bg-white outline-none">
-                    {employmentTypes?.map(type => <option key={type} value={type}>{type}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Status *</label>
-                  <select required name="status" defaultValue={employee.status || 'ACTIVE'} className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-black outline-none">
-                    <option value="ACTIVE">Active</option>
-                    <option value="ON_LEAVE">On Leave</option>
-                    <option value="TERMINATED">Terminated</option>
-                    <option value="RESIGNED">Resigned</option>
-                  </select>
-                </div>
-              </div>
-              
               <div>
-                <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Join Date</label>
-                <input name="joinDate" type="date" defaultValue={defaultJoinDate} className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black outline-none" />
+                <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Employee Code / ID *</label>
+                <input required name="employeeCode" defaultValue={employee.employeeCode} type="text" className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black outline-none uppercase font-mono" />
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Email</label>
+                <input name="email" defaultValue={employee.email} type="email" className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Phone *</label>
+                <input required name="phone" defaultValue={employee.phone} type="text" className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Gender</label>
+                <select name="gender" defaultValue={employee.gender || ''} className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-black outline-none">
+                  <option value="">-- Optional --</option>
+                  {genders.map(g => <option key={g} value={g}>{g}</option>)}
+                </select>
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Department *</label>
+                <input required name="department" defaultValue={employee.department} list="departments-list" autoComplete="off" className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black outline-none" />
+                <datalist id="departments-list">
+                  {departments?.map(dept => <option key={dept} value={dept} />)}
+                </datalist>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Position *</label>
+                <input required name="position" defaultValue={employee.position} list="positions-list" autoComplete="off" className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black outline-none" />
+                <datalist id="positions-list">
+                  {positions?.map(pos => <option key={pos} value={pos} />)}
+                </datalist>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Blood Group</label>
+                <select name="bloodGroup" defaultValue={employee.bloodGroup || ''} className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-black outline-none">
+                  <option value="">-- Optional --</option>
+                  {bloodGroups.map(bg => <option key={bg} value={bg}>{bg}</option>)}
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Date of Birth</label>
+                <input name="dateOfBirth" type="date" defaultValue={defaultDobDate} className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black outline-none font-mono" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Employment Type</label>
+                <select name="employmentType" defaultValue={defaultEmploymentType} className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg focus:ring-2 focus:ring-black text-sm bg-white outline-none">
+                  {employmentTypes?.map(type => <option key={type} value={type}>{type}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Status *</label>
+                <select required name="status" defaultValue={employee.status || 'ACTIVE'} className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-black outline-none">
+                  <option value="ACTIVE">Active</option>
+                  <option value="ON_LEAVE">On Leave</option>
+                  <option value="TERMINATED">Terminated</option>
+                  <option value="RESIGNED">Resigned</option>
+                </select>
               </div>
             </div>
           </div>
@@ -216,7 +241,11 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSuccess
               <Wallet size={16} className="text-emerald-600"/> Payroll & Compensation
             </h3>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">Joining Date *</label>
+                <input name="joinDate" type="date" required defaultValue={defaultJoinDate} className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black outline-none font-mono" />
+              </div>
               <div>
                 <label className="block text-xs font-bold text-neutral-700 uppercase mb-1.5">Gross Base Salary (৳)</label>
                 <input required name="baseSalary" defaultValue={employee.baseSalary || 0} type="number" step="0.01" className="w-full p-2.5 border border-neutral-300 rounded-lg text-sm outline-none focus:border-black font-semibold" />
@@ -276,7 +305,7 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSuccess
             </div>
           </div>
 
-          {/* DYNAMIC FIELDS FROM SETTINGS */}
+          {/* DYNAMIC FIELDS FROM SETTINGS (including emergency contact if defined there) */}
           {employeeFields?.length > 0 && (
             <div className="pt-2 space-y-4">
               <h3 className="text-sm font-bold text-neutral-900 uppercase tracking-wider flex items-center gap-2 border-b border-neutral-100 pb-2">
@@ -284,18 +313,22 @@ export default function EditEmployeeModal({ isOpen, onClose, employee, onSuccess
               </h3>
               {employeeFields.map((field: any) => {
                 const defaultValue = getCustomFieldValue(field.label);
+                
+                // FORCE emergency contact to be optional if it comes from dynamic fields
+                const isRequired = field.label.toLowerCase().includes('emergency') ? false : field.required;
+
                 return (
                   <div key={field.id}>
                     <label className="block text-xs font-semibold text-neutral-600 uppercase tracking-wider mb-1.5">
-                      {field.label} {field.required && <span className="text-red-500">*</span>}
+                      {field.label} {isRequired && <span className="text-red-500">*</span>}
                     </label>
                     {field.type === 'select' ? (
-                      <select name={field.id} required={field.required} defaultValue={defaultValue} className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-black outline-none">
+                      <select name={field.id} required={isRequired} defaultValue={defaultValue} className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-black outline-none">
                         <option value="">Select {field.label}</option>
                         {field.options?.map((opt: string) => <option key={opt} value={opt}>{opt}</option>)}
                       </select>
                     ) : (
-                      <input name={field.id} type={field.type} required={field.required} defaultValue={defaultValue} className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black outline-none" />
+                      <input name={field.id} type={field.type} required={isRequired} defaultValue={defaultValue} className="w-full px-3 py-2.5 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-black outline-none" />
                     )}
                   </div>
                 );
