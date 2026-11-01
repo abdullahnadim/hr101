@@ -15,7 +15,8 @@ export async function PUT(
   try {
     const resolvedParams = await params;
     const id = resolvedParams.id;
-    const { name, phone, email, address, status } = await request.json();
+    // FIX: Removed 'status' from destructuring
+    const { name, phone, email, address, contactPerson } = await request.json();
 
     if (!id || !name) {
       return NextResponse.json({ error: 'Vendor name is required' }, { status: 400 });
@@ -25,10 +26,11 @@ export async function PUT(
       where: { id },
       data: {
         name: name.trim(),
+        contactPerson: contactPerson || null,
         phone: phone || null,
         email: email || null,
         address: address || null,
-        status: status || 'ACTIVE',
+        // FIX: Removed 'status' field mapping here
       }
     });
 

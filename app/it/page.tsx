@@ -86,7 +86,7 @@ export default function ITAssetsDashboard() {
     e.preventDefault();
     setSubmitting(true);
     
-    const payload = { ...assetForm };
+    const payload: any = { ...assetForm };
     if (payload.assignedToId) payload.status = 'ASSIGNED';
     else payload.status = 'AVAILABLE';
     

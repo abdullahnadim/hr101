@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcryptjs'; // Change to 'bcryptjs' if that is what your project uses
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
@@ -38,6 +38,7 @@ export async function GET() {
         employeeCode: 'FAL-ADMIN',
         name: 'System Administrator',
         email: 'admin@fal.com.bd',
+        phone: '01700000000', // FIX: Added required phone field
         position: 'Super Admin',
         department: 'IT',
         joiningDate: new Date(),
@@ -51,8 +52,8 @@ export async function GET() {
     await prisma.user.create({
       data: {
         email: 'admin@fal.com.bd',
-        password: hashedPassword,
-        name: 'System Administrator',
+        passwordHash: hashedPassword, // FIX: Changed from 'password' to 'passwordHash'
+        orgId: org.id,                // FIX: Added required orgId field
         roleId: superAdminRole.id,
         employeeId: adminEmployee.id,
       }

@@ -197,7 +197,7 @@ export default function EmployeesPage() {
                       </td>
                       <td className="px-6 py-4">
                         <div className="font-bold text-neutral-900 flex items-center gap-2 text-base">
-                          {emp.name} {emp.user && <CheckCircle2 size={16} className="text-emerald-500" title="System User" />}
+                          {emp.user && <span title="System User"><CheckCircle2 size={16} className="text-emerald-500" /></span>}
                         </div>
                         <div className="text-xs text-neutral-500 font-mono mt-0.5">{emp.employeeCode || 'ID Pending'}</div>
                       </td>
@@ -264,7 +264,7 @@ export default function EmployeesPage() {
       )}
 
       {/* Extracted Modals */}
-      <AddEmployeeModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSuccess={(newEmp) => { setEmployees([newEmp, ...employees]); setIsCreateModalOpen(false); }} />
+      <AddEmployeeModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSuccess={(newEmp: any) => { setEmployees([newEmp, ...employees]); setIsCreateModalOpen(false); }} />
       <EditEmployeeModal isOpen={!!editingEmployee} onClose={() => setEditingEmployee(null)} employee={editingEmployee} onSuccess={() => { fetchEmployees(); setEditingEmployee(null); }} />
     </div>
   );
