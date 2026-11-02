@@ -1,27 +1,17 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth'; // Ensure this path matches your auth config
+import { requirePermission } from '@/lib/permissions';
 
 const prisma = new PrismaClient();
 
 // Fetch all vendors for the dropdown (with multi-module RBAC)
 export async function GET() {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authRead = await requirePermission('RECEPTION', 'READ');
+    const authSettings = await requirePermission('SETTINGS', 'READ');
+    const authCreate = await requirePermission('RECEPTION', 'CREATE');
 
-    const roleName = (session.user as any)?.roleName;
-    const permissions = (session.user as any)?.permissions || [];
-    const isAdmin = roleName === 'ADMIN' || roleName === 'Super Admin';
-
-    // Allow if Admin, OR has Settings Read, OR has Reception Read/Create
-    const canViewVendors = isAdmin || 
-                           permissions.includes('SETTINGS:READ') || 
-                           permissions.includes('RECEPTION:CREATE') ||
-                           permissions.includes('RECEPTION:READ');
-
-    if (!canViewVendors) {
+    if (!authRead.authorized && !authSettings.authorized && !authCreate.authorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -43,19 +33,10 @@ export async function GET() {
 // Quick-create a vendor from the Bill Entry modal (with multi-module RBAC)
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authSettings = await requirePermission('SETTINGS', 'CREATE');
+    const authReception = await requirePermission('RECEPTION', 'CREATE');
 
-    const roleName = (session.user as any)?.roleName;
-    const permissions = (session.user as any)?.permissions || [];
-    const isAdmin = roleName === 'ADMIN' || roleName === 'Super Admin';
-
-    // Allow if Admin, OR has Settings Create, OR has Reception Create
-    const canCreateVendors = isAdmin || 
-                             permissions.includes('SETTINGS:CREATE') || 
-                             permissions.includes('RECEPTION:CREATE');
-
-    if (!canCreateVendors) {
+    if (!authSettings.authorized && !authReception.authorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
