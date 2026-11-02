@@ -2,7 +2,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { 
   FileSpreadsheet, Search, Loader2, Send, AlertCircle, 
-  CheckCircle2, Clock, CheckSquare, Square, X, ArrowRight, ShieldAlert 
+  CheckCircle2, Clock, CheckSquare, Square, X, ArrowRight, ShieldAlert,
+  Building2, ChevronRight, UserCircle, Receipt
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -10,14 +11,67 @@ interface BillEntry {
   id: string;
   systemSerialNo: string;
   billNumber: string;
+  entryAt: string;
   billDate: string;
   amount: number;
   category: string;
   department: string;
   status: string;
+  discrepancyNote?: string;
+  accountsReceivedAt?: string;
+  auditReceivedAt?: string;
+  approvedAt?: string;
+  disbursedAt?: string;
   vendor: { name: string };
-  recordedBy?: { name: string };
+  user?: { name: string; email: string };
+  recordedBy?: { name: string; employeeCode: string };
+  approvedBy?: { name: string };
 }
+
+// --- PREMIUM STATUS BADGE ---
+const StatusBadge = ({ status }: { status: string }) => {
+  const styles: Record<string, string> = {
+    SENT_TO_ACCOUNTS: 'bg-blue-50 text-blue-700 border-blue-200/60',
+    APPROVED_FOR_DISBURSEMENT: 'bg-teal-50 text-teal-700 border-teal-200/60',
+  };
+
+  const labels: Record<string, string> = {
+    SENT_TO_ACCOUNTS: 'Pending Review',
+    APPROVED_FOR_DISBURSEMENT: 'Ready to Pay',
+  };
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest border ${styles[status] || 'bg-neutral-100 text-neutral-600'}`}>
+      {labels[status] || status}
+    </span>
+  );
+};
+
+// --- SLEEK COMPACT TIMELINE ---
+const CompactTimeline = ({ bill }: { bill: BillEntry }) => {
+  const formatTime = (d: string) => new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const enteredBy = bill.recordedBy?.name || bill.user?.name || bill.user?.email?.split('@')[0] || 'System User';
+
+  return (
+    <div className="flex flex-col gap-2 mt-3 border-l-2 border-neutral-100 pl-3 ml-1 relative">
+      <div className="relative">
+        <div className="absolute -left-[17px] top-[5px] w-2 h-2 rounded-full bg-neutral-300 ring-4 ring-white"></div>
+        <p className="text-[10px] text-neutral-500 leading-tight">
+          <span className="font-bold text-neutral-700">Submitted:</span> {bill.entryAt ? formatTime(bill.entryAt) : 'N/A'}<br/>
+          <span className="italic">by {enteredBy}</span>
+        </p>
+      </div>
+
+      <div className="relative">
+        <div className={`absolute -left-[17px] top-[5px] w-2 h-2 rounded-full ring-4 ring-white ${bill.accountsReceivedAt ? 'bg-blue-400' : 'bg-neutral-200'}`}></div>
+        <p className="text-[10px] text-neutral-500 leading-tight">
+          <span className={`font-bold ${bill.accountsReceivedAt ? 'text-blue-700' : 'text-neutral-400'}`}>Accounts Received:</span><br/>
+          {bill.accountsReceivedAt ? formatTime(bill.accountsReceivedAt) : 'Awaiting sync'}
+        </p>
+      </div>
+    </div>
+  );
+};
 
 export default function AccountsHub() {
   const [bills, setBills] = useState<BillEntry[]>([]);
@@ -25,10 +79,8 @@ export default function AccountsHub() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED'>('PENDING');
   
-  // Selection for Bulk Audit Forwarding
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
-  // Discrepancy Modal State
   const [discrepancyModalOpen, setDiscrepancyModalOpen] = useState(false);
   const [selectedBillId, setSelectedBillId] = useState<string | null>(null);
   const [discrepancyNote, setDiscrepancyNote] = useState('');
@@ -49,7 +101,6 @@ export default function AccountsHub() {
     fetchBills();
   }, [fetchBills]);
 
-  // --- BULK ACTION: SEND TO AUDIT ---
   const handleSendToAudit = async () => {
     if (!confirm(`Forward ${selectedIds.length} bills to Internal Audit for final verification?`)) return;
     try {
@@ -63,12 +114,9 @@ export default function AccountsHub() {
       setBills(bills.filter(b => !selectedIds.includes(b.id)));
       setSelectedIds([]);
       alert("Successfully forwarded to Internal Audit.");
-    } catch (err) {
-      alert("Failed to forward bills.");
-    }
+    } catch (err) { alert("Failed to forward bills."); }
   };
 
-  // --- SINGLE ACTION: RETURN TO FRONT DESK ---
   const handleReturnToFrontDesk = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBillId || !discrepancyNote.trim()) return;
@@ -89,11 +137,7 @@ export default function AccountsHub() {
       } else {
         alert("Failed to return bill.");
       }
-    } catch (err) {
-      alert("A network error occurred.");
-    } finally {
-      setSubmitting(false);
-    }
+    } catch (err) { alert("A network error occurred."); } finally { setSubmitting(false); }
   };
 
   const openDiscrepancyModal = (id: string) => {
@@ -102,13 +146,10 @@ export default function AccountsHub() {
     setDiscrepancyModalOpen(true);
   };
 
-  // --- FILTERING ---
   const displayedBills = bills.filter(bill => {
-    // Tab Filtering
     if (activeTab === 'PENDING' && bill.status !== 'SENT_TO_ACCOUNTS') return false;
     if (activeTab === 'APPROVED' && bill.status !== 'APPROVED_FOR_DISBURSEMENT') return false;
     
-    // Search Filtering
     const searchString = `${bill.vendor?.name} ${bill.systemSerialNo} ${bill.billNumber}`.toLowerCase();
     return searchString.includes(searchQuery.toLowerCase());
   });
@@ -123,7 +164,7 @@ export default function AccountsHub() {
   };
 
   return (
-    <div className="p-4 md:p-8 w-full max-w-7xl mx-auto space-y-6 animate-in fade-in duration-300 pb-24">
+    <div className="p-4 md:p-8 w-full max-w-none space-y-6 animate-in fade-in duration-300 pb-24">
       
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -134,130 +175,175 @@ export default function AccountsHub() {
         </div>
       </header>
 
-      {/* Bulk Action Sticky Bar */}
+      {/* BULK ACTION BAR */}
       {selectedIds.length > 0 && activeTab === 'PENDING' && (
-        <div className="bg-indigo-900 text-white px-6 py-3.5 rounded-2xl flex items-center justify-between shadow-xl animate-in slide-in-from-bottom-4 duration-200">
+        <div className="bg-indigo-900 text-white px-6 py-3.5 rounded-2xl flex items-center justify-between shadow-xl animate-in slide-in-from-bottom-4 duration-200 border border-indigo-800">
           <div className="flex items-center gap-3 text-sm font-medium">
             <span className="bg-white text-indigo-900 font-bold px-2.5 py-0.5 rounded-full text-xs">{selectedIds.length}</span>
             <span>bills verified and ready for audit</span>
           </div>
           <div className="flex items-center gap-3">
-            <button 
-              onClick={handleSendToAudit}
-              className="flex items-center gap-1.5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg transition-colors shadow-sm"
-            >
+            <button onClick={handleSendToAudit} className="flex items-center gap-1.5 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl transition-colors shadow-md border border-indigo-500 hover:border-indigo-400">
               <Send size={14} /> Send to Internal Audit
             </button>
-            <button onClick={() => setSelectedIds([])} className="text-xs text-indigo-300 hover:text-white px-2 py-1">Deselect All</button>
+            <button onClick={() => setSelectedIds([])} className="text-xs text-indigo-300 hover:text-white px-2 py-1 transition-colors">Deselect All</button>
           </div>
         </div>
       )}
 
-      <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-[500px]">
+      {/* PREMIUM SaaS LIST VIEW */}
+      <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-[600px]">
         
-        {/* Tabs & Search */}
-        <div className="p-4 border-b border-neutral-200 bg-neutral-50/50 flex flex-col lg:flex-row gap-4 justify-between items-center">
-          <div className="flex items-center gap-2 w-full lg:w-auto">
-            <button 
-              onClick={() => { setActiveTab('PENDING'); setSelectedIds([]); }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'PENDING' ? 'bg-black text-white shadow-sm' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-100'}`}
-            >
-              <Clock size={14} /> Pending Initial Review
-            </button>
-            <button 
-              onClick={() => { setActiveTab('APPROVED'); setSelectedIds([]); }}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all ${activeTab === 'APPROVED' ? 'bg-black text-white shadow-sm' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-100'}`}
-            >
-              <CheckCircle2 size={14} /> Ready for Disbursement
-            </button>
+        {/* Sleek Intelligent Toolbar */}
+        <div className="p-4 border-b border-neutral-100 flex flex-col xl:flex-row gap-4 justify-between items-center bg-neutral-50/30">
+          
+          <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 w-full xl:w-auto overflow-x-auto pb-2 xl:pb-0 custom-scrollbar">
+            
+            {/* Tab Filters */}
+            <div className="flex items-center bg-neutral-100/80 p-1 rounded-xl border border-neutral-200/60 shrink-0">
+              <button 
+                onClick={() => { setActiveTab('PENDING'); setSelectedIds([]); }}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                  activeTab === 'PENDING' ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200/50' : 'text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                <Clock size={14} className={activeTab === 'PENDING' ? 'text-amber-500' : ''} /> Pending Initial Review
+              </button>
+              <button 
+                onClick={() => { setActiveTab('APPROVED'); setSelectedIds([]); }}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                  activeTab === 'APPROVED' ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200/50' : 'text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                <CheckCircle2 size={14} className={activeTab === 'APPROVED' ? 'text-teal-600' : ''} /> Ready for Disbursement
+              </button>
+            </div>
           </div>
           
-          <div className="relative w-full lg:w-80">
-            <Search className="absolute left-3 top-2.5 text-neutral-400" size={16} />
-            <input type="text" placeholder="Search vendor, serial, invoice..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-neutral-200 rounded-lg text-sm outline-none focus:border-black transition-shadow bg-white" />
+          {/* Search Bar */}
+          <div className="relative w-full xl:w-72 shrink-0">
+            <Search className="absolute left-3.5 top-2.5 text-neutral-400" size={16} />
+            <input type="text" placeholder="Search entries..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 border border-neutral-200 rounded-xl text-sm outline-none focus:border-indigo-500 transition-colors bg-white shadow-sm" />
           </div>
         </div>
 
-        {/* Table */}
-        <div className="flex-1 overflow-x-auto">
+        {/* --- GRID LIST VIEW --- */}
+        <div className="flex-1 bg-white">
           {loading ? (
-            <div className="h-64 flex justify-center items-center"><Loader2 className="animate-spin text-neutral-400" size={28} /></div>
+            <div className="h-[400px] flex justify-center items-center"><Loader2 className="animate-spin text-neutral-400" size={28} /></div>
           ) : displayedBills.length === 0 ? (
-            <div className="h-64 flex flex-col items-center justify-center text-neutral-400">
-              <FileSpreadsheet size={48} className="text-neutral-200 mb-4" />
-              <p className="font-bold text-neutral-900">No bills in this queue</p>
-              <p className="text-sm">You are all caught up for now.</p>
+            <div className="h-[400px] flex flex-col items-center justify-center text-neutral-400">
+              <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center mb-4 border border-neutral-100">
+                <FileSpreadsheet size={24} className="text-neutral-400" />
+              </div>
+              <p className="font-bold text-neutral-900 text-lg">No bills in this queue</p>
+              <p className="text-sm mt-1">You are all caught up for now.</p>
             </div>
           ) : (
-            <table className="w-full text-sm text-left whitespace-nowrap">
-              <thead className="bg-neutral-50 text-neutral-600 font-bold border-b border-neutral-200 text-[11px] uppercase tracking-wider sticky top-0">
-                <tr>
-                  {activeTab === 'PENDING' && (
-                    <th className="px-4 py-4 w-12 text-center">
-                      <button onClick={toggleSelectAll} className="text-neutral-500 hover:text-black">
-                        {selectedIds.length === displayedBills.length && displayedBills.length > 0 ? <CheckSquare size={16} className="text-indigo-600" /> : <Square size={16} />}
-                      </button>
-                    </th>
-                  )}
-                  <th className="px-6 py-4">System Serial</th>
-                  <th className="px-6 py-4">Vendor & Details</th>
-                  <th className="px-6 py-4">Category</th>
-                  <th className="px-6 py-4 text-right">Amount</th>
-                  {activeTab === 'PENDING' && <th className="px-6 py-4 text-right">Action</th>}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100">
-                {displayedBills.map(bill => {
-                  const isSelected = selectedIds.includes(bill.id);
-                  return (
-                    <tr key={bill.id} className={`hover:bg-neutral-50/80 transition-colors group ${isSelected ? 'bg-indigo-50/40' : ''}`}>
-                      {activeTab === 'PENDING' && (
-                        <td className="px-4 py-4 text-center">
-                          <button onClick={() => toggleSelectOne(bill.id)} className="text-neutral-400 hover:text-black">
-                            {isSelected ? <CheckSquare size={16} className="text-indigo-600" /> : <Square size={16} />}
-                          </button>
-                        </td>
+            <div className="divide-y divide-neutral-100">
+              {/* Desktop Header */}
+              <div className="hidden lg:grid grid-cols-12 gap-4 px-6 py-3 bg-neutral-50/80 text-[10px] font-bold uppercase tracking-widest text-neutral-500 sticky top-0 z-10 border-b border-neutral-200">
+                <div className="col-span-1 text-center">Select</div>
+                <div className="col-span-3">Vendor & Identity</div>
+                <div className="col-span-2 text-left">Invoice Details</div>
+                <div className="col-span-2 text-right">Amount (৳)</div>
+                <div className="col-span-3 pl-12">Timeline & Status</div>
+                <div className="col-span-1 text-right">Action</div>
+              </div>
+
+              {/* List Rows */}
+              {displayedBills.map(bill => {
+                const isSelected = selectedIds.includes(bill.id);
+                
+                return (
+                  <div key={bill.id} className={`grid grid-cols-1 lg:grid-cols-12 gap-4 px-4 py-5 lg:px-6 items-start lg:items-center transition-all group border-l-2 ${isSelected ? 'bg-indigo-50/30 border-indigo-500' : 'bg-white border-transparent hover:border-neutral-200'}`}>
+                    
+                    {/* 1. Select Box */}
+                    <div className="col-span-1 hidden lg:flex justify-center items-center">
+                      {activeTab === 'PENDING' ? (
+                        <button onClick={() => toggleSelectOne(bill.id)} className={`transition-colors p-1 rounded ${isSelected ? 'text-indigo-600 bg-indigo-100/50' : 'text-neutral-300 hover:text-neutral-600 hover:bg-neutral-100'}`}>
+                          {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
+                        </button>
+                      ) : (
+                        <div className="w-6 h-6 flex items-center justify-center opacity-30"><CheckSquare size={18} className="text-neutral-300" /></div>
                       )}
-                      <td className="px-6 py-4">
-                        <div className="font-mono font-bold text-indigo-700">{bill.systemSerialNo}</div>
-                        <div className="text-[10px] text-neutral-500 font-mono mt-0.5 tracking-wider uppercase">Inv: {bill.billNumber || 'N/A'}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="font-bold text-neutral-900">{bill.vendor?.name}</div>
-                        <div className="text-[10px] text-neutral-500 mt-0.5">Date: {new Date(bill.billDate).toLocaleDateString()}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="bg-neutral-100 px-2.5 py-1 rounded-md text-[10px] font-bold text-neutral-700 uppercase tracking-wider border border-neutral-200">{bill.category}</span>
-                      </td>
-                      <td className="px-6 py-4 text-right font-black text-neutral-900 text-base">
-                        ৳ {bill.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
+                    </div>
+
+                    {/* 2. Vendor & Identity */}
+                    <div className="col-span-1 lg:col-span-3">
+                      <div className="flex items-center gap-3">
+                        {/* Mobile select checkbox */}
+                        <div className="lg:hidden shrink-0">
+                           {activeTab === 'PENDING' && (
+                             <button onClick={() => toggleSelectOne(bill.id)} className={isSelected ? 'text-indigo-600' : 'text-neutral-300'}><CheckSquare size={18} /></button>
+                           )}
+                        </div>
+                        <div className="w-10 h-10 rounded-xl bg-neutral-50 border border-neutral-200/60 flex items-center justify-center shrink-0">
+                          <Building2 size={18} className="text-neutral-500" />
+                        </div>
+                        <div className="overflow-hidden">
+                          <h3 className="font-bold text-neutral-900 text-sm truncate">{bill.vendor?.name}</h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] font-mono font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded tracking-wider border border-indigo-100">{bill.systemSerialNo}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3. Invoice Details */}
+                    <div className="col-span-1 lg:col-span-2 pl-12 lg:pl-0 flex flex-col justify-center">
+                      <div className="font-mono text-xs font-bold text-neutral-800">
+                        {new Date(bill.billDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </div>
+                      <div className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider mt-1 bg-neutral-100 px-1.5 py-0.5 rounded-md inline-block w-max">
+                        {bill.category}
+                      </div>
+                      <div className="text-[10px] text-neutral-400 font-mono mt-1">
+                        Inv: {bill.billNumber || 'N/A'}
+                      </div>
+                    </div>
+
+                    {/* 4. Amount */}
+                    <div className="col-span-1 lg:col-span-2 text-left lg:text-right pl-12 lg:pl-0 flex flex-col justify-center">
+                      <div className="text-lg font-black text-neutral-900 tracking-tight">
+                        ৳ {bill.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+
+                    {/* 5. Timeline & Status */}
+                    <div className="col-span-1 lg:col-span-3 pl-12 flex flex-col justify-center">
+                      <StatusBadge status={bill.status} />
+                      <CompactTimeline bill={bill} />
+                    </div>
+
+                    {/* 6. Action */}
+                    <div className="col-span-1 lg:col-span-1 flex justify-end absolute lg:relative right-4 top-4 lg:right-0 lg:top-0">
                       {activeTab === 'PENDING' && (
-                        <td className="px-6 py-4 text-right">
-                          <button 
-                            onClick={() => openDiscrepancyModal(bill.id)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors"
-                          >
-                            <ShieldAlert size={14} /> Flag Discrepancy
-                          </button>
-                        </td>
+                        <button 
+                          onClick={() => openDiscrepancyModal(bill.id)} 
+                          className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors shadow-sm"
+                          title="Flag Discrepancy"
+                        >
+                          <ShieldAlert size={14} /> Flag
+                        </button>
                       )}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
 
-      {/* Discrepancy Modal */}
+      {/* --- DISCREPANCY MODAL --- */}
       {discrepancyModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 p-4 animate-in fade-in zoom-in-95 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-md rounded-2xl overflow-hidden shadow-2xl">
-            <div className="px-6 py-4 border-b bg-amber-50 text-amber-900 font-bold flex justify-between items-center">
-              <h2 className="flex items-center gap-2"><AlertCircle size={18} /> Return to Entry Desk</h2>
-              <button onClick={() => setDiscrepancyModalOpen(false)} className="p-1 hover:bg-amber-100 rounded text-amber-700"><X size={18} /></button>
+          <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)]">
+            <div className="px-6 py-5 border-b bg-amber-50 text-amber-900 font-bold flex justify-between items-center">
+              <h2 className="flex items-center gap-2"><AlertCircle size={18} strokeWidth={2.5}/> Return to Entry Desk</h2>
+              <button onClick={() => setDiscrepancyModalOpen(false)} className="p-1 hover:bg-amber-100 rounded-lg text-amber-700 transition-colors"><X size={18} /></button>
             </div>
             <form onSubmit={handleReturnToFrontDesk} className="p-6 space-y-4">
               <p className="text-sm text-neutral-600">Please provide a clear reason for returning this bill to the Front Desk (e.g., missing signature, incorrect amount, blurred document).</p>
@@ -268,15 +354,15 @@ export default function AccountsHub() {
                   required rows={3} autoFocus
                   value={discrepancyNote} 
                   onChange={e => setDiscrepancyNote(e.target.value)} 
-                  className="w-full px-4 py-3 border border-neutral-200 rounded-lg text-sm focus:border-amber-500 outline-none bg-white transition-colors resize-none" 
+                  className="w-full px-4 py-3 border border-neutral-200 rounded-xl text-sm focus:border-amber-500 focus:ring-1 focus:ring-amber-500 outline-none bg-neutral-50/50 focus:bg-white transition-all resize-none shadow-sm" 
                   placeholder="State the exact issue here..." 
                 />
               </div>
 
               <div className="pt-4 flex justify-end gap-3 border-t mt-4 border-neutral-100">
-                <button type="button" onClick={() => setDiscrepancyModalOpen(false)} className="px-5 py-2.5 text-sm font-bold text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors">Cancel</button>
-                <button type="submit" disabled={submitting || !discrepancyNote.trim()} className="px-6 py-2.5 text-sm font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-lg disabled:opacity-50 transition-colors flex items-center gap-2 shadow-sm">
-                  {submitting ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
+                <button type="button" onClick={() => setDiscrepancyModalOpen(false)} className="px-5 py-3 text-sm font-bold text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors">Cancel</button>
+                <button type="submit" disabled={submitting || !discrepancyNote.trim()} className="px-6 py-3 text-sm font-bold bg-amber-600 hover:bg-amber-700 text-white rounded-xl disabled:opacity-50 transition-all flex items-center gap-2 shadow-md hover:shadow-lg active:scale-95">
+                  {submitting ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} strokeWidth={3} />}
                   Return Bill
                 </button>
               </div>

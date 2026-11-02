@@ -16,14 +16,14 @@ export async function GET(request: Request) {
     const bills = await prisma.receptionBill.findMany({
       where: { 
         orgId: org.id,
-        // Audit only sees bills forwarded to them, or bills they have approved
-        status: { in: ['SENT_TO_AUDIT', 'APPROVED_FOR_DISBURSEMENT'] }
+        // Audit sees their active queue, plus historical approvals/disbursements
+        status: { in: ['SENT_TO_AUDIT', 'APPROVED_FOR_DISBURSEMENT', 'DISBURSED'] }
       },
       include: {
         vendor: { select: { name: true } },
         recordedBy: { select: { name: true, employeeCode: true } }
       },
-      orderBy: { updatedAt: 'desc' }
+      orderBy: { createdAt: 'desc' }
     });
 
     return NextResponse.json(bills);

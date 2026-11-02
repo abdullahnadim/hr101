@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { requirePermission } from '@/lib/permissions';
+import { getServerSession } from 'next-auth';
 
 const prisma = new PrismaClient();
 
@@ -35,12 +36,25 @@ export async function POST(request: Request) {
   if (!auth.authorized) return auth.response;
 
   try {
+    const session = await getServerSession();
+    if (!session || !session.user?.email) {
+      return NextResponse.json({ error: 'Unauthorized user session' }, { status: 401 });
+    }
+
     const org = await prisma.organization.findFirst();
     if (!org) return NextResponse.json({ error: "Organization not found" }, { status: 404 });
 
-    // TEMPORARY: For testing, fetch the first employee if session auth is not yet wired
-    const testUser = await prisma.user.findFirst({ where: { employeeId: { not: null } } });
-    const employeeId = testUser?.employeeId; 
+    // FIX: Retrieve the actual logged-in user to link as the creator
+    const currentUser = await prisma.user.findUnique({ 
+      where: { email: session.user.email },
+      select: { employeeId: true }
+    });
+    
+    if (!currentUser || !currentUser.employeeId) {
+      return NextResponse.json({ error: 'Your user account is not linked to an employee profile.' }, { status: 403 });
+    }
+
+    const employeeId = currentUser.employeeId;
 
     const { vendorId, billDate, amount, category, billNumber, department, description } = await request.json();
 
@@ -84,9 +98,8 @@ export async function POST(request: Request) {
           department: department || null,
           description: description || null,
           status: 'DRAFT',
-          vendorId: vendorId, // Maps directly to the Vendor relational model
-          recordedById: employeeId,
-          // entryAt is automatically set by the @default(now()) in Prisma
+          vendorId: vendorId, 
+          recordedById: employeeId, // Now securely assigned to the active user!
         },
         include: {
           vendor: { select: { name: true } },

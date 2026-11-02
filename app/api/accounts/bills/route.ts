@@ -13,17 +13,21 @@ export async function GET(request: Request) {
     const org = await prisma.organization.findFirst();
     if (!org) return NextResponse.json({ error: "Organization not found" }, { status: 404 });
 
+    // Fetch bills waiting for Accounts review, fully approved, or disbursed
     const bills = await prisma.receptionBill.findMany({
       where: { 
         orgId: org.id,
-        // Accounts only sees bills forwarded to them, or bills fully approved for disbursement
-        status: { in: ['SENT_TO_ACCOUNTS', 'APPROVED_FOR_DISBURSEMENT'] }
+        status: { 
+          in: ['SENT_TO_ACCOUNTS', 'APPROVED_FOR_DISBURSEMENT', 'DISBURSED'] 
+        }
       },
       include: {
         vendor: { select: { name: true } },
-        recordedBy: { select: { name: true, employeeCode: true } }
+        recordedBy: { select: { name: true, employeeCode: true } },
+        // If your schema supports approvedBy, uncomment the line below. Otherwise leave it removed.
+        // approvedBy: { select: { name: true } } 
       },
-      orderBy: { updatedAt: 'desc' }
+      orderBy: { createdAt: 'desc' } // Newest entries first
     });
 
     return NextResponse.json(bills);

@@ -3,7 +3,8 @@ import { useState, useEffect, useRef } from 'react';
 import { 
   Receipt, Calendar, Building2, DollarSign, Plus, Clock, 
   Search, Loader2, ArrowLeft, Edit2, Trash2, Download, 
-  CheckSquare, Square, X, Send, AlertCircle, FileText, Save
+  CheckSquare, Square, X, Send, AlertCircle, FileText, Save,
+  MoreHorizontal, ChevronRight, UserCircle, CheckCircle2, CircleDashed
 } from 'lucide-react';
 import Link from 'next/link';
 import * as XLSX from 'xlsx';
@@ -23,64 +24,96 @@ interface BillEntry {
   accountsReceivedAt?: string;
   auditReceivedAt?: string;
   approvedAt?: string;
+  disbursedAt?: string;
   vendor: { name: string }; 
   user?: { name: string; email: string };
   recordedBy?: { name: string; employeeCode: string };
+  approvedBy?: { name: string };
 }
 
 const BILL_CATEGORIES = ['Supplier/party bill', 'Salary', 'Overtime', 'Incentive', 'Other'];
 
-// --- TIMELINE COMPONENT ---
-const WorkflowTimeline = ({ bill }: { bill: BillEntry }) => {
-  const formatTime = (d: string) => new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
-  const enteredBy = bill.recordedBy?.name || bill.user?.name || bill.user?.email?.split('@')[0] || 'System';
+// --- PREMIUM STATUS BADGE ---
+const StatusBadge = ({ status }: { status: string }) => {
+  const styles: Record<string, string> = {
+    DRAFT: 'bg-neutral-100 text-neutral-600 border-neutral-200/60',
+    SENT_TO_ACCOUNTS: 'bg-blue-50 text-blue-700 border-blue-200/60',
+    DISCREPANCY: 'bg-red-50 text-red-700 border-red-200/60',
+    SENT_TO_AUDIT: 'bg-purple-50 text-purple-700 border-purple-200/60',
+    APPROVED_FOR_DISBURSEMENT: 'bg-teal-50 text-teal-700 border-teal-200/60',
+    DISBURSED: 'bg-emerald-50 text-emerald-700 border-emerald-200/60',
+  };
+
+  const labels: Record<string, string> = {
+    DRAFT: 'Draft Entry',
+    SENT_TO_ACCOUNTS: 'In Accounts',
+    DISCREPANCY: 'Discrepancy',
+    SENT_TO_AUDIT: 'In Audit',
+    APPROVED_FOR_DISBURSEMENT: 'Approved',
+    DISBURSED: 'Disbursed',
+  };
 
   return (
-    <div className="mt-2.5 p-2 bg-neutral-50/80 rounded-md border border-neutral-100 shadow-inner w-full max-w-[220px]">
-      <div className="flex flex-col gap-1.5">
-        
-        <div className="flex justify-between items-start gap-3 text-[9px] font-mono tracking-wider uppercase text-neutral-500">
-          <span className="font-bold">Entry:</span> 
-          <span className="text-right leading-tight">
-            {formatTime(bill.entryAt)}<br/>
-            <span className="text-[8px] text-neutral-400 capitalize normal-case">by {enteredBy}</span>
-          </span>
-        </div>
+    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest border ${styles[status] || styles.DRAFT}`}>
+      {status === 'DISCREPANCY' && <AlertCircle size={10} strokeWidth={3} />}
+      {status === 'DISBURSED' && <CheckCircle2 size={10} strokeWidth={3} />}
+      {labels[status] || status}
+    </span>
+  );
+};
 
-        {bill.accountsReceivedAt && (
-          <div className="flex justify-between items-center gap-3 text-[9px] font-mono tracking-wider uppercase text-blue-600 border-t border-neutral-200 pt-1.5">
-            <span className="font-bold">Accounts:</span> 
-            <span>{formatTime(bill.accountsReceivedAt)}</span>
-          </div>
-        )}
+// --- SLEEK COMPACT TIMELINE ---
+const CompactTimeline = ({ bill }: { bill: BillEntry }) => {
+  const formatTime = (d: string) => new Date(d).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const enteredBy = bill.recordedBy?.name || bill.user?.name || bill.user?.email?.split('@')[0] || 'System User';
+  const approverName = bill.approvedBy?.name || 'Authorized Signatory';
 
-        {bill.auditReceivedAt && (
-          <div className="flex justify-between items-center gap-3 text-[9px] font-mono tracking-wider uppercase text-purple-600 border-t border-neutral-200 pt-1.5">
-            <span className="font-bold">Audit:</span> 
-            <span>{formatTime(bill.auditReceivedAt)}</span>
-          </div>
-        )}
-
-        {bill.approvedAt && (
-          <div className="flex justify-between items-center gap-3 text-[9px] font-mono tracking-wider uppercase text-emerald-600 border-t border-neutral-200 pt-1.5">
-            <span className="font-bold">Approved:</span> 
-            <span>{formatTime(bill.approvedAt)}</span>
-          </div>
-        )}
-
+  return (
+    <div className="flex flex-col gap-2 mt-3 border-l-2 border-neutral-100 pl-3 ml-1 relative">
+      {/* Entry Step */}
+      <div className="relative">
+        <div className="absolute -left-[17px] top-[5px] w-2 h-2 rounded-full bg-neutral-300 ring-4 ring-white"></div>
+        <p className="text-[10px] text-neutral-500 leading-tight">
+          <span className="font-bold text-neutral-700">Submitted:</span> {formatTime(bill.entryAt)}<br/>
+          <span className="italic">by {enteredBy}</span>
+        </p>
       </div>
+
+      {/* Approval Step */}
+      {(bill.approvedAt || bill.status === 'APPROVED_FOR_DISBURSEMENT' || bill.status === 'DISBURSED') && (
+        <div className="relative">
+          <div className="absolute -left-[17px] top-[5px] w-2 h-2 rounded-full bg-teal-400 ring-4 ring-white"></div>
+          <p className="text-[10px] text-neutral-500 leading-tight">
+            <span className="font-bold text-teal-700">Approved:</span> {bill.approvedAt ? formatTime(bill.approvedAt) : 'Pending Date'}<br/>
+            {bill.approvedAt && <span className="italic">by {approverName}</span>}
+          </p>
+        </div>
+      )}
+
+      {/* Disbursement Step */}
+      {(bill.disbursedAt || bill.status === 'DISBURSED') && (
+        <div className="relative">
+          <div className="absolute -left-[17px] top-[5px] w-2 h-2 rounded-full bg-emerald-500 ring-4 ring-white"></div>
+          <p className="text-[10px] text-neutral-500 leading-tight">
+            <span className="font-bold text-emerald-700">Disbursed:</span> {bill.disbursedAt ? formatTime(bill.disbursedAt) : 'Pending Date'}
+          </p>
+        </div>
+      )}
     </div>
   );
 };
+
 
 export default function ReceptionBillLogBook() {
   const [bills, setBills] = useState<BillEntry[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
   
-  // Filter & Export States
-  const [filterMode, setFilterMode] = useState<'all' | 'month' | 'week' | 'custom'>('all');
+  // Search & Filter State
+  const [searchQuery, setSearchQuery] = useState('');
+  const [dateFilterMode, setDateFilterMode] = useState<'all' | 'month' | 'week' | 'custom'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'disbursed'>('all');
+  
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); 
   const [selectedWeek, setSelectedWeek] = useState(''); 
   const [customStart, setCustomStart] = useState('');
@@ -94,7 +127,6 @@ export default function ReceptionBillLogBook() {
   const [editingBillId, setEditingBillId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   
-  // Smart Autocomplete State
   const [vendorSearch, setVendorSearch] = useState('');
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
   const [formData, setFormData] = useState({ vendorId: '', billDate: '', amount: '', category: 'Supplier/party bill', description: '', billNumber: '' });
@@ -114,7 +146,6 @@ export default function ReceptionBillLogBook() {
     });
   }, []);
 
-  // Close dropdown if clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -125,7 +156,6 @@ export default function ReceptionBillLogBook() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- SELECTION HANDLERS ---
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredBills.length) setSelectedIds([]);
     else setSelectedIds(filteredBills.map(b => b.id));
@@ -135,7 +165,6 @@ export default function ReceptionBillLogBook() {
     setSelectedIds(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
   };
 
-  // --- WORKFLOW: SEND TO ACCOUNTS ---
   const handleSendToAccounts = async () => {
     if (!confirm(`Forward ${selectedIds.length} bills to Accounts for checking?`)) return;
     try {
@@ -149,12 +178,9 @@ export default function ReceptionBillLogBook() {
       setBills(bills.map(b => selectedIds.includes(b.id) ? { ...b, status: 'SENT_TO_ACCOUNTS', accountsReceivedAt: new Date().toISOString() } : b));
       setSelectedIds([]);
       alert("Successfully forwarded to Accounts.");
-    } catch (err) {
-      alert("Failed to forward bills.");
-    }
+    } catch (err) { alert("Failed to forward bills."); }
   };
 
-  // --- BULK DELETE ---
   const handleBulkDelete = async () => {
     if (!confirm(`Are you sure you want to delete ${selectedIds.length} bill entries?`)) return;
     try {
@@ -163,9 +189,7 @@ export default function ReceptionBillLogBook() {
       }
       setBills(bills.filter(b => !selectedIds.includes(b.id)));
       setSelectedIds([]);
-    } catch (err) {
-      alert("Failed to delete selected bills.");
-    }
+    } catch (err) { alert("Failed to delete selected bills."); }
   };
 
   const openNewModal = () => {
@@ -199,24 +223,6 @@ export default function ReceptionBillLogBook() {
     setShowVendorDropdown(false);
   };
 
-  const handleCreateInlineVendor = async () => {
-    if (!vendorSearch.trim()) return;
-    try {
-      const res = await fetch('/api/configuration/vendors', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: vendorSearch })
-      });
-      if (res.ok) {
-        const newVendor = await res.json();
-        setVendors([...vendors, newVendor].sort((a, b) => a.name.localeCompare(b.name)));
-        selectVendor(newVendor);
-      }
-    } catch (error) {
-      alert("Failed to create vendor");
-    }
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.vendorId) return alert("Please select a vendor.");
@@ -244,44 +250,43 @@ export default function ReceptionBillLogBook() {
     } catch (error) { alert("A network error occurred."); } finally { setSubmitting(false); }
   };
 
+  // --- COMPREHENSIVE FILTERING ENGINE ---
   const filteredBills = bills.filter(bill => {
+    // 1. Text Search Filter
     const searchString = `${bill.vendor?.name} ${bill.billNumber} ${bill.systemSerialNo}`.toLowerCase();
     if (!searchString.includes(searchQuery.toLowerCase())) return false;
     
-    const billDate = new Date(bill.billDate || bill.entryAt);
-
-    if (filterMode === 'month' && selectedMonth) {
-      const [year, month] = selectedMonth.split('-');
-      if (billDate.getFullYear() !== parseInt(year) || (billDate.getMonth() + 1) !== parseInt(month)) {
-        return false;
-      }
+    // 2. Status Filter
+    if (statusFilter === 'pending') {
+      if (!['DRAFT', 'SENT_TO_ACCOUNTS', 'DISCREPANCY', 'SENT_TO_AUDIT'].includes(bill.status)) return false;
+    } else if (statusFilter === 'disbursed') {
+      if (!['APPROVED_FOR_DISBURSEMENT', 'DISBURSED'].includes(bill.status)) return false;
     }
 
-    if (filterMode === 'week' && selectedWeek) {
+    // 3. Date Filter
+    const billDate = new Date(bill.billDate || bill.entryAt);
+    if (dateFilterMode === 'month' && selectedMonth) {
+      const [year, month] = selectedMonth.split('-');
+      if (billDate.getFullYear() !== parseInt(year) || (billDate.getMonth() + 1) !== parseInt(month)) return false;
+    }
+    if (dateFilterMode === 'week' && selectedWeek) {
       const targetYear = parseInt(selectedWeek.split('-W')[0]);
       const targetWeek = parseInt(selectedWeek.split('-W')[1]);
       const onejan = new Date(billDate.getFullYear(), 0, 1);
       const weekNum = Math.ceil((((billDate.getTime() - onejan.getTime()) / 86400000) + onejan.getDay() + 1) / 7);
       if (billDate.getFullYear() !== targetYear || weekNum !== targetWeek) return false;
     }
-
-    if (filterMode === 'custom') {
+    if (dateFilterMode === 'custom') {
       if (customStart && new Date(bill.billDate) < new Date(customStart)) return false;
       if (customEnd && new Date(bill.billDate) > new Date(customEnd)) return false;
     }
-
     return true;
   });
 
   const filteredVendors = vendors.filter(v => v.name.toLowerCase().includes(vendorSearch.toLowerCase()));
-  const exactVendorMatch = vendors.find(v => v.name.toLowerCase() === vendorSearch.toLowerCase());
 
-  // --- EXPORT TO EXCEL ---
   const handleExport = () => {
-    const targetList = selectedIds.length > 0 
-      ? bills.filter(b => selectedIds.includes(b.id))
-      : filteredBills;
-
+    const targetList = selectedIds.length > 0 ? bills.filter(b => selectedIds.includes(b.id)) : filteredBills;
     const formattedData = targetList.map((bill, index) => {
       const enteredBy = bill.recordedBy?.name || bill.user?.name || bill.user?.email?.split('@')[0] || 'System User';
       return {
@@ -297,24 +302,11 @@ export default function ReceptionBillLogBook() {
         'Entered By': enteredBy
       };
     });
-
     const worksheet = XLSX.utils.json_to_sheet(formattedData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Bill Logbook");
     XLSX.writeFile(workbook, `Reception_Bills_${new Date().toISOString().split('T')[0]}.xlsx`);
     setIsExportModalOpen(false);
-  };
-
-  // Status Badge Component
-  const StatusBadge = ({ status }: { status: string }) => {
-    switch(status) {
-      case 'DRAFT': return <span className="px-2 py-1 bg-neutral-100 text-neutral-600 rounded text-[10px] font-bold uppercase tracking-wider border border-neutral-200">Draft</span>;
-      case 'SENT_TO_ACCOUNTS': return <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-[10px] font-bold uppercase tracking-wider border border-blue-100">In Accounts</span>;
-      case 'DISCREPANCY': return <span className="px-2 py-1 bg-red-50 text-red-700 rounded text-[10px] font-bold uppercase tracking-wider border border-red-100 flex items-center gap-1"><AlertCircle size={10}/> Discrepancy</span>;
-      case 'SENT_TO_AUDIT': return <span className="px-2 py-1 bg-purple-50 text-purple-700 rounded text-[10px] font-bold uppercase tracking-wider border border-purple-100">In Audit</span>;
-      case 'APPROVED_FOR_DISBURSEMENT': return <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded text-[10px] font-bold uppercase tracking-wider border border-emerald-100">Disbursement</span>;
-      default: return null;
-    }
   };
 
   return (
@@ -333,19 +325,19 @@ export default function ReceptionBillLogBook() {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={() => setIsExportModalOpen(true)} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-neutral-200 text-neutral-700 text-sm font-bold rounded-lg hover:bg-neutral-50 transition-colors shadow-sm">
-            <Download size={16} /> Export Reports
+            <Download size={16} /> Export
           </button>
-          <button onClick={openNewModal} className="flex items-center gap-2 bg-black text-white px-4 py-2.5 rounded-lg text-sm font-bold hover:bg-neutral-800 shadow-sm active:scale-95 transition-all">
+          <button onClick={openNewModal} className="flex items-center gap-2 bg-black text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-neutral-800 shadow-md active:scale-95 transition-all">
             <Plus size={16} /> New Bill Entry
           </button>
         </div>
       </div>
 
-      {/* FR-02: Workflow Bulk Action Bar */}
+      {/* BULK ACTION BAR */}
       {selectedIds.length > 0 && (
-        <div className="bg-blue-900 text-white px-6 py-3.5 rounded-2xl flex items-center justify-between shadow-xl animate-in slide-in-from-bottom-4 duration-200 border border-blue-800">
+        <div className="bg-neutral-900 text-white px-6 py-3.5 rounded-2xl flex items-center justify-between shadow-xl animate-in slide-in-from-bottom-4 duration-200 border border-neutral-800">
           <div className="flex items-center gap-3 text-sm font-medium">
-            <span className="bg-white text-blue-900 font-bold px-2.5 py-0.5 rounded-full text-xs">{selectedIds.length}</span>
+            <span className="bg-white text-neutral-900 font-bold px-2.5 py-0.5 rounded-full text-xs">{selectedIds.length}</span>
             <span>draft entries selected</span>
           </div>
           <div className="flex items-center gap-3">
@@ -355,135 +347,189 @@ export default function ReceptionBillLogBook() {
             <button onClick={handleBulkDelete} className="flex items-center gap-1.5 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-colors shadow-sm border border-red-500">
               <Trash2 size={14} /> Delete
             </button>
-            <button onClick={() => setSelectedIds([])} className="text-xs text-blue-300 hover:text-white px-2 py-1">Deselect All</button>
+            <button onClick={() => setSelectedIds([])} className="text-xs text-neutral-400 hover:text-white px-2 py-1 transition-colors">Deselect All</button>
           </div>
         </div>
       )}
 
-      {/* Main Table Container */}
+      {/* PREMIUM SaaS LIST VIEW */}
       <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-[600px]">
         
-        {/* Toolbar */}
-        <div className="p-4 border-b border-neutral-200 bg-neutral-50/50 flex flex-col lg:flex-row gap-4 justify-between items-center">
+        {/* Sleek Intelligent Toolbar */}
+        <div className="p-4 border-b border-neutral-100 flex flex-col xl:flex-row gap-4 justify-between items-center bg-neutral-50/30">
           
-          <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto pb-2 lg:pb-0">
-            <button onClick={() => setFilterMode('all')} className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${filterMode === 'all' ? 'bg-black text-white shadow-sm' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-100'}`}>
-              All Time
-            </button>
-            <button onClick={() => setFilterMode('month')} className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${filterMode === 'month' ? 'bg-black text-white shadow-sm' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-100'}`}>
-              Month-wise
-            </button>
-            <button onClick={() => setFilterMode('week')} className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${filterMode === 'week' ? 'bg-black text-white shadow-sm' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-100'}`}>
-              Week-wise
-            </button>
-            <button onClick={() => setFilterMode('custom')} className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap ${filterMode === 'custom' ? 'bg-black text-white shadow-sm' : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-100'}`}>
-              Custom Dates
-            </button>
+          <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 w-full xl:w-auto overflow-x-auto pb-2 xl:pb-0 custom-scrollbar">
+            
+            {/* Status Filters */}
+            <div className="flex items-center bg-neutral-100/80 p-1 rounded-xl border border-neutral-200/60 shrink-0">
+              {[
+                { id: 'all', label: 'All Bills' }, 
+                { id: 'pending', label: 'Pending / Drafts' }, 
+                { id: 'disbursed', label: 'Approved / Disbursed' }
+              ].map(f => (
+                <button 
+                  key={f.id} onClick={() => setStatusFilter(f.id as any)}
+                  className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                    statusFilter === f.id ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200/50' : 'text-neutral-500 hover:text-neutral-700'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            
+            <div className="hidden lg:block w-px h-6 bg-neutral-200 shrink-0"></div>
 
-            {filterMode === 'month' && (
-              <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="px-3 py-1.5 border border-neutral-200 rounded-lg text-xs bg-white font-mono" />
-            )}
+            {/* Date Filters */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {['all', 'month', 'week', 'custom'].map((mode) => (
+                <button 
+                  key={mode} onClick={() => setDateFilterMode(mode as any)} 
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap capitalize ${
+                    dateFilterMode === mode ? 'bg-neutral-900 text-white shadow-sm' : 'bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-50'
+                  }`}
+                >
+                  {mode === 'all' ? 'All Time' : mode}
+                </button>
+              ))}
+              
+              {/* Dynamic Date Inputs */}
+              {dateFilterMode === 'month' && <input type="month" value={selectedMonth} onChange={(e) => setSelectedMonth(e.target.value)} className="px-3 py-1.5 border border-neutral-200 rounded-lg text-xs bg-white font-mono ml-1" />}
+              {dateFilterMode === 'week' && <input type="week" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className="px-3 py-1.5 border border-neutral-200 rounded-lg text-xs bg-white font-mono ml-1" />}
+              {dateFilterMode === 'custom' && (
+                <div className="flex items-center gap-1.5 ml-2">
+                  <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="px-2 py-1.5 border border-neutral-200 rounded-lg text-xs font-mono bg-white" />
+                  <span className="text-xs text-neutral-400 font-medium">to</span>
+                  <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="px-2 py-1.5 border border-neutral-200 rounded-lg text-xs font-mono bg-white" />
+                </div>
+              )}
+            </div>
 
-            {filterMode === 'week' && (
-              <input type="week" value={selectedWeek} onChange={(e) => setSelectedWeek(e.target.value)} className="px-3 py-1.5 border border-neutral-200 rounded-lg text-xs bg-white font-mono" />
-            )}
-
-            {filterMode === 'custom' && (
-              <div className="flex items-center gap-2">
-                <input type="date" value={customStart} onChange={(e) => setCustomStart(e.target.value)} className="px-2 py-1.5 border border-neutral-200 rounded-lg text-xs font-mono bg-white" />
-                <span className="text-xs text-neutral-400">to</span>
-                <input type="date" value={customEnd} onChange={(e) => setCustomEnd(e.target.value)} className="px-2 py-1.5 border border-neutral-200 rounded-lg text-xs font-mono bg-white" />
-              </div>
-            )}
           </div>
           
-          <div className="relative w-full lg:w-80">
-            <Search className="absolute left-3 top-2.5 text-neutral-400" size={16} />
-            <input type="text" placeholder="Search vendor, bill no, recorder..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-neutral-200 rounded-lg text-sm outline-none focus:border-black transition-shadow bg-white" />
+          {/* Search Bar */}
+          <div className="relative w-full xl:w-72 shrink-0">
+            <Search className="absolute left-3.5 top-2.5 text-neutral-400" size={16} />
+            <input type="text" placeholder="Search entries..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-neutral-200 rounded-xl text-sm outline-none focus:border-neutral-900 transition-colors bg-white shadow-sm" />
           </div>
         </div>
 
-        {/* Main Table */}
-        <div className="flex-1 overflow-x-auto">
+        {/* --- GRID LIST VIEW --- */}
+        <div className="flex-1 bg-white">
           {loading ? (
             <div className="h-[400px] flex justify-center items-center"><Loader2 className="animate-spin text-neutral-400" size={28} /></div>
           ) : filteredBills.length === 0 ? (
             <div className="h-[400px] flex flex-col items-center justify-center text-neutral-400">
-              <Receipt size={48} className="text-neutral-200 mb-4" />
-              <p className="font-bold text-neutral-900">No records found</p>
-              <p className="text-sm">There are no bills matching your search or filters.</p>
+              <div className="w-16 h-16 bg-neutral-50 rounded-full flex items-center justify-center mb-4 border border-neutral-100">
+                <Receipt size={24} className="text-neutral-400" />
+              </div>
+              <p className="font-bold text-neutral-900 text-lg">No records found</p>
+              <p className="text-sm mt-1">Adjust your filters or enter a new bill.</p>
             </div>
           ) : (
-            <table className="w-full text-sm text-left whitespace-nowrap">
-              <thead className="bg-neutral-50 text-neutral-600 font-bold border-b border-neutral-200 text-[11px] uppercase tracking-wider sticky top-0 z-10">
-                <tr>
-                  <th className="px-4 py-4 w-12 text-center">
-                    <button onClick={toggleSelectAll} className="text-neutral-500 hover:text-black">
-                      {selectedIds.length === filteredBills.length && filteredBills.length > 0 ? <CheckSquare size={16} className="text-blue-600" /> : <Square size={16} />}
-                    </button>
-                  </th>
-                  <th className="px-6 py-4">Serial & Inv No</th>
-                  <th className="px-6 py-4">Vendor & Category</th>
-                  <th className="px-6 py-4">Date & Status</th>
-                  <th className="px-6 py-4 text-right">Amount</th>
-                  <th className="px-6 py-4 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-neutral-100">
-                {filteredBills.map(bill => {
-                  const isSelected = selectedIds.includes(bill.id);
-                  const enteredBy = bill.recordedBy?.name || bill.user?.name || bill.user?.email?.split('@')[0] || 'System User';
+            <div className="divide-y divide-neutral-100">
+              {/* Desktop Header */}
+              <div className="hidden lg:grid grid-cols-12 gap-4 px-6 py-3 bg-neutral-50/80 text-[10px] font-bold uppercase tracking-widest text-neutral-500 sticky top-0 z-10 border-b border-neutral-200">
+                <div className="col-span-1 text-center">Select</div>
+                <div className="col-span-3">Vendor & Identity</div>
+                <div className="col-span-3 text-left">Invoice Details</div>
+                <div className="col-span-2 text-right">Amount (৳)</div>
+                <div className="col-span-2 pl-8">Timeline & Status</div> {/* MOVED TO END */}
+                <div className="col-span-1 text-right">Action</div>
+              </div>
 
-                  return (
-                    <tr key={bill.id} className={`hover:bg-neutral-50/80 transition-colors group ${isSelected ? 'bg-blue-50/40' : ''}`}>
-                      <td className="px-4 py-4 text-center">
-                         {/* Only Drafts can be selected for sending */}
-                        {bill.status === 'DRAFT' && (
-                          <button onClick={() => toggleSelectOne(bill.id)} className="text-neutral-400 hover:text-black">
-                            {isSelected ? <CheckSquare size={16} className="text-blue-600" /> : <Square size={16} />}
-                          </button>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="font-mono font-bold text-neutral-900">{bill.systemSerialNo}</div>
-                        <div className="text-[10px] text-neutral-500 font-mono mt-0.5 tracking-wider uppercase">Inv: {bill.billNumber || 'N/A'}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="font-bold text-neutral-900">{bill.vendor?.name}</div>
-                        <div className="text-[10px] font-bold text-blue-600 mt-1 uppercase tracking-wider">{bill.category}</div>
-                        {bill.discrepancyNote && (
-                          <div className="text-[10px] text-red-600 mt-1 flex items-start gap-1 max-w-[200px] truncate" title={bill.discrepancyNote}>
-                            <AlertCircle size={12} className="shrink-0 mt-0.5"/> {bill.discrepancyNote}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-1.5 text-neutral-600 mb-2">
-                          <Calendar size={14} className="text-neutral-400" />
-                          {new Date(bill.billDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+              {/* List Rows */}
+              {filteredBills.map(bill => {
+                const isSelected = selectedIds.includes(bill.id);
+                
+                return (
+                  <div key={bill.id} className={`grid grid-cols-1 lg:grid-cols-12 gap-4 px-4 py-5 lg:px-6 items-start lg:items-center transition-all group border-l-2 ${isSelected ? 'bg-blue-50/30 border-blue-500' : 'bg-white border-transparent hover:border-neutral-200'}`}>
+                    
+                    {/* 1. Select Box */}
+                    <div className="col-span-1 hidden lg:flex justify-center items-center">
+                      {bill.status === 'DRAFT' ? (
+                        <button onClick={() => toggleSelectOne(bill.id)} className={`transition-colors p-1 rounded ${isSelected ? 'text-blue-600 bg-blue-100/50' : 'text-neutral-300 hover:text-neutral-600 hover:bg-neutral-100'}`}>
+                          {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
+                        </button>
+                      ) : (
+                        <div className="w-6 h-6 flex items-center justify-center opacity-30"><CircleDashed size={18} className="text-neutral-300" /></div>
+                      )}
+                    </div>
+
+                    {/* 2. Vendor & Identity */}
+                    <div className="col-span-1 lg:col-span-3">
+                      <div className="flex items-center gap-3">
+                        {/* Mobile select checkbox */}
+                        <div className="lg:hidden shrink-0">
+                           {bill.status === 'DRAFT' && (
+                             <button onClick={() => toggleSelectOne(bill.id)} className={isSelected ? 'text-blue-600' : 'text-neutral-300'}><CheckSquare size={18} /></button>
+                           )}
                         </div>
-                        <StatusBadge status={bill.status} />
-                        
-                        {/* INJECTED WORKFLOW TIMELINE */}
-                        <WorkflowTimeline bill={bill} />
-                        
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="font-black text-neutral-900 text-base">৳ {bill.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                        <div className="text-[10px] text-neutral-400 font-normal italic mt-1">By: {enteredBy}</div>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        {(bill.status === 'DRAFT' || bill.status === 'DISCREPANCY') && (
-                          <button onClick={() => openEditModal(bill)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100" title="Edit">
-                            <Edit2 size={16} />
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                        <div className="w-10 h-10 rounded-xl bg-neutral-50 border border-neutral-200/60 flex items-center justify-center shrink-0">
+                          <Building2 size={18} className="text-neutral-500" />
+                        </div>
+                        <div className="overflow-hidden">
+                          <h3 className="font-bold text-neutral-900 text-sm truncate">{bill.vendor?.name}</h3>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] font-mono font-bold text-neutral-600 bg-neutral-100 px-1.5 py-0.5 rounded tracking-wider">{bill.systemSerialNo}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3. Invoice Details */}
+                    <div className="col-span-1 lg:col-span-3 pl-12 lg:pl-0 flex flex-col justify-center">
+                      <div className="font-mono text-xs font-bold text-neutral-800">
+                        {new Date(bill.billDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </div>
+                      <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mt-1">
+                        {bill.category}
+                      </div>
+                      <div className="text-[10px] text-neutral-400 font-mono mt-0.5">
+                        Inv: {bill.billNumber || 'N/A'}
+                      </div>
+                    </div>
+
+                    {/* 4. Amount */}
+                    <div className="col-span-1 lg:col-span-2 text-left lg:text-right pl-12 lg:pl-0 flex flex-col justify-center">
+                      <div className="text-lg font-black text-neutral-900 tracking-tight">
+                        ৳ {bill.amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+
+                    {/* 5. Timeline & Status (MOVED TO RIGHT) */}
+                    {/* 5. Timeline & Status (MOVED TO RIGHT) */}
+<div className="col-span-1 lg:col-span-2 pl-12 lg:pl-8 flex flex-col justify-center items-start">
+  <StatusBadge status={bill.status} />
+  
+  {/* FIX: Explicitly render Accounts' discrepancy comments! */}
+  {bill.discrepancyNote && (
+    <div className="mt-2 p-2 bg-red-50 border border-red-100 rounded-md text-[10px] text-red-700 font-medium leading-tight max-w-full">
+      <div className="flex items-start gap-1.5">
+        <AlertCircle size={12} className="shrink-0 mt-0.5 text-red-600" />
+        <span className="italic">{bill.discrepancyNote}</span>
+      </div>
+    </div>
+  )}
+
+  <CompactTimeline bill={bill} />
+</div>
+
+                    {/* 6. Action */}
+                    <div className="col-span-1 lg:col-span-1 flex justify-end absolute lg:relative right-4 top-4 lg:right-0 lg:top-0">
+                      {(bill.status === 'DRAFT' || bill.status === 'DISCREPANCY') ? (
+                        <button onClick={() => openEditModal(bill)} className="p-2 text-neutral-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-transparent hover:border-blue-100 shadow-sm bg-white lg:bg-transparent lg:shadow-none" title="Edit">
+                          <Edit2 size={16} />
+                        </button>
+                      ) : (
+                        <div className="p-2 text-neutral-300 hidden lg:block" title="Locked"><MoreHorizontal size={16} /></div>
+                      )}
+                    </div>
+
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
@@ -491,8 +537,8 @@ export default function ReceptionBillLogBook() {
       {/* --- EXPORT MODAL --- */}
       {isExportModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in-95 duration-200">
-          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl flex flex-col overflow-hidden">
-            <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+            <div className="px-6 py-5 border-b border-neutral-100 flex items-center justify-between bg-neutral-50/50">
               <h2 className="font-bold text-neutral-900 flex items-center gap-2">
                 <Download size={18} className="text-blue-600" /> Export Bill Logbook
               </h2>
@@ -502,15 +548,16 @@ export default function ReceptionBillLogBook() {
             </div>
             <div className="p-6 space-y-4 text-sm text-neutral-600">
               <p>You are about to export bill records to Excel based on your current filters:</p>
-              <div className="p-3 bg-neutral-50 rounded-xl border border-neutral-200 space-y-1 font-medium text-xs">
-                <p>Filter Mode: <span className="text-black uppercase font-bold">{filterMode}</span></p>
-                <p>Records targeted: <span className="text-black font-bold">{selectedIds.length > 0 ? `${selectedIds.length} (Selected rows)` : `${filteredBills.length} (Current filtered view)`}</span></p>
+              <div className="p-4 bg-neutral-50 rounded-xl border border-neutral-200 space-y-2 font-medium text-xs">
+                <p className="flex justify-between"><span>Date Filter:</span> <span className="text-black uppercase font-bold">{dateFilterMode}</span></p>
+                <p className="flex justify-between"><span>Status Filter:</span> <span className="text-black uppercase font-bold">{statusFilter}</span></p>
+                <p className="flex justify-between border-t border-neutral-200 pt-2"><span>Targeted Export:</span> <span className="text-blue-600 font-bold text-sm">{selectedIds.length > 0 ? `${selectedIds.length} Rows` : `${filteredBills.length} Rows`}</span></p>
               </div>
             </div>
-            <div className="px-6 py-4 bg-neutral-50 border-t border-neutral-100 flex justify-end gap-3">
-              <button onClick={() => setIsExportModalOpen(false)} className="px-4 py-2 text-sm font-bold text-neutral-600 hover:bg-neutral-200 rounded-lg">Cancel</button>
-              <button onClick={handleExport} className="px-5 py-2 bg-black text-white text-sm font-bold rounded-lg hover:bg-neutral-800 shadow-sm flex items-center gap-2">
-                <Download size={14} /> Download Excel
+            <div className="px-6 py-5 bg-neutral-50/50 border-t border-neutral-100 flex justify-end gap-3">
+              <button onClick={() => setIsExportModalOpen(false)} className="px-5 py-2.5 text-sm font-bold text-neutral-600 hover:bg-neutral-200 rounded-xl transition-colors">Cancel</button>
+              <button onClick={handleExport} className="px-6 py-2.5 bg-black text-white text-sm font-bold rounded-xl hover:bg-neutral-800 shadow-md active:scale-95 transition-all flex items-center gap-2">
+                <Download size={14} /> Generate Excel
               </button>
             </div>
           </div>
@@ -520,34 +567,40 @@ export default function ReceptionBillLogBook() {
       {/* --- ENTRY MODAL --- */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-neutral-900/60 p-4 animate-in fade-in zoom-in-95 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl">
-            <div className="px-6 py-5 border-b bg-neutral-50 font-bold text-neutral-900 flex justify-between items-center">
-              <h2 className="flex items-center gap-2"><Receipt size={18} className="text-blue-600"/> {editingBillId ? 'Correct Bill Entry' : 'Log Physical Bill'}</h2>
-              {!editingBillId && <span className="text-[10px] font-bold text-blue-600 bg-blue-100 border border-blue-200 px-2 py-1 rounded uppercase tracking-wider">System Serial Auto-Gen</span>}
+          <div className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)]">
+            <div className="px-6 py-5 border-b bg-neutral-50/50 flex justify-between items-center">
+              <h2 className="font-extrabold text-neutral-900 text-lg flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center"><Receipt size={16}/></div>
+                {editingBillId ? 'Update Bill Entry' : 'Log Physical Bill'}
+              </h2>
+              {!editingBillId && <span className="text-[9px] font-black text-blue-600 bg-blue-50 border border-blue-100 px-2 py-1 rounded-md uppercase tracking-widest">Serial Auto-Gen</span>}
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-5">
               
               <div className="relative" ref={dropdownRef}>
-                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Building2 size={14} /> Vendor Name / Payee</label>
+                <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Building2 size={14} className="text-neutral-400" /> Vendor / Payee Name *</label>
                 <input 
                   type="text" value={vendorSearch}
                   onChange={(e) => { setVendorSearch(e.target.value); setShowVendorDropdown(true); setFormData({ ...formData, vendorId: '' }); }}
                   onFocus={() => setShowVendorDropdown(true)}
-                  className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:border-black outline-none bg-white transition-colors"
-                  placeholder="Select or type to add new..."
+                  className="w-full px-4 py-3 border border-neutral-200 rounded-xl text-sm focus:border-black outline-none bg-neutral-50/50 focus:bg-white transition-colors"
+                  placeholder="Select or type to search..."
                 />
                 
                 {showVendorDropdown && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-neutral-200 rounded-lg shadow-xl max-h-48 overflow-y-auto">
-                    {filteredVendors.map(v => (
-                      <button key={v.id} type="button" onClick={() => selectVendor(v)} className="w-full text-left px-4 py-2.5 text-sm hover:bg-neutral-50 transition-colors font-medium text-neutral-900 border-b border-neutral-100">
-                        {v.name}
-                      </button>
-                    ))}
-                    {vendorSearch && !exactVendorMatch && (
-                      <button type="button" onClick={handleCreateInlineVendor} className="w-full text-left px-4 py-3 text-sm text-blue-700 bg-blue-50 font-bold hover:bg-blue-100 transition-colors flex items-center gap-2 sticky bottom-0">
-                        <Plus size={14} /> Create "{vendorSearch}"
-                      </button>
+                  <div className="absolute z-10 w-full mt-2 bg-white border border-neutral-100 rounded-xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] max-h-48 overflow-y-auto custom-scrollbar">
+                    {filteredVendors.length > 0 ? (
+                      filteredVendors.map(v => (
+                        <button key={v.id} type="button" onClick={() => selectVendor(v)} className="w-full text-left px-4 py-3 text-sm hover:bg-neutral-50 transition-colors font-semibold text-neutral-900 border-b border-neutral-50 last:border-0 flex items-center justify-between group">
+                          {v.name}
+                          <ChevronRight size={14} className="text-neutral-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
+                      ))
+                    ) : (
+                      <div className="w-full text-left px-4 py-4 text-sm text-neutral-500 italic bg-neutral-50/50 flex items-start gap-2">
+                        <AlertCircle size={16} className="text-neutral-400 shrink-0 mt-0.5"/>
+                        <span>No vendor found. Please ask Admin/HR to add this vendor to the directory.</span>
+                      </div>
                     )}
                   </div>
                 )}
@@ -555,38 +608,38 @@ export default function ReceptionBillLogBook() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2 flex items-center gap-1.5"><FileText size={14} /> Bill Category *</label>
-                  <select required value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm bg-white focus:border-black outline-none transition-colors">
+                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2 flex items-center gap-1.5"><FileText size={14} className="text-neutral-400" /> Category *</label>
+                  <select required value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full px-4 py-3 border border-neutral-200 rounded-xl text-sm bg-neutral-50/50 focus:bg-white focus:border-black outline-none transition-colors">
                     {BILL_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Invoice/Bill No.</label>
-                  <input type="text" value={formData.billNumber} onChange={e => setFormData({...formData, billNumber: e.target.value})} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:border-black outline-none font-mono" placeholder="If applicable" />
+                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Invoice / Bill No.</label>
+                  <input type="text" value={formData.billNumber} onChange={e => setFormData({...formData, billNumber: e.target.value})} className="w-full px-4 py-3 border border-neutral-200 rounded-xl text-sm focus:border-black outline-none font-mono bg-neutral-50/50 focus:bg-white transition-colors" placeholder="Optional" />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Calendar size={14} /> Date on Bill *</label>
-                  <input type="date" required value={formData.billDate} onChange={e => setFormData({...formData, billDate: e.target.value})} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm bg-white focus:border-black outline-none font-mono" />
+                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2 flex items-center gap-1.5"><Calendar size={14} className="text-neutral-400" /> Date on Bill *</label>
+                  <input type="date" required value={formData.billDate} onChange={e => setFormData({...formData, billDate: e.target.value})} className="w-full px-4 py-3 border border-neutral-200 rounded-xl text-sm focus:border-black outline-none font-mono bg-neutral-50/50 focus:bg-white transition-colors" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2 flex items-center gap-1.5"><DollarSign size={14} /> Amount (৳) *</label>
-                  <input type="number" step="0.01" required value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:border-black outline-none bg-white font-mono" placeholder="0.00" />
+                  <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2 flex items-center gap-1.5"><DollarSign size={14} className="text-neutral-400" /> Amount (৳) *</label>
+                  <input type="number" step="0.01" required value={formData.amount} onChange={e => setFormData({...formData, amount: e.target.value})} className="w-full px-4 py-3 border border-neutral-200 rounded-xl text-sm focus:border-black outline-none font-mono bg-neutral-50/50 focus:bg-white transition-colors text-lg" placeholder="0.00" />
                 </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-neutral-700 uppercase tracking-wider mb-2">Description / Purpose</label>
-                <textarea rows={2} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full px-4 py-2.5 border border-neutral-200 rounded-lg text-sm focus:border-black outline-none transition-colors" placeholder="Optional notes for Accounts..." />
+                <textarea rows={2} value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full px-4 py-3 border border-neutral-200 rounded-xl text-sm focus:border-black outline-none resize-none bg-neutral-50/50 focus:bg-white transition-colors" placeholder="Optional notes for Accounts review..." />
               </div>
 
-              <div className="pt-4 flex justify-end gap-3 border-t mt-6 border-neutral-100">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 text-sm font-bold text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors">Cancel</button>
-                <button type="submit" disabled={submitting || !formData.vendorId} className="px-6 py-2.5 text-sm font-bold bg-black text-white rounded-lg disabled:opacity-50 transition-colors flex items-center gap-2 active:scale-95 shadow-sm">
+              <div className="pt-2 flex justify-end gap-3 border-t mt-6 border-neutral-100">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-3 text-sm font-bold text-neutral-600 hover:bg-neutral-100 rounded-xl transition-colors">Cancel</button>
+                <button type="submit" disabled={submitting || !formData.vendorId} className="px-6 py-3 text-sm font-bold bg-black text-white rounded-xl disabled:opacity-50 transition-all flex items-center gap-2 active:scale-95 shadow-md hover:shadow-lg">
                   {submitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                  {editingBillId ? 'Update & Resubmit' : 'Save Draft Record'}
+                  {editingBillId ? 'Update Record' : 'Save Entry'}
                 </button>
               </div>
             </form>

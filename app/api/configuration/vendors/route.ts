@@ -1,12 +1,25 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { requirePermission } from '@/lib/permissions';
 
 const prisma = new PrismaClient();
 
 export async function GET() {
   try {
-    // Fetch all vendors, sorted alphabetically
+    // Receptionists can read the list to attach to bills, Admins can read for settings
+    const authSettings = await requirePermission('SETTINGS', 'READ');
+    const authReception = await requirePermission('RECEPTION', 'CREATE');
+    const authReceptionRead = await requirePermission('RECEPTION', 'READ');
+    
+    if (!authSettings.authorized && !authReception.authorized && !authReceptionRead.authorized) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const org = await prisma.organization.findFirst();
+    if (!org) return NextResponse.json({ error: "Organization not found" }, { status: 404 });
+
     const vendors = await prisma.vendor.findMany({
+      where: { orgId: org.id },
       orderBy: { name: 'asc' }
     });
 
@@ -19,6 +32,16 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
+    // STRICT: Only Admin or users with explicit SETTINGS:CREATE can add vendors
+    const authSettings = await requirePermission('SETTINGS', 'CREATE');
+    
+    if (!authSettings.authorized) {
+      return NextResponse.json({ error: 'Forbidden. Only Admins or HR can create vendors.' }, { status: 403 });
+    }
+
+    const org = await prisma.organization.findFirst();
+    if (!org) return NextResponse.json({ error: "Organization not found" }, { status: 404 });
+
     const { name, contactPerson, email, phone, address } = await request.json();
 
     if (!name) {
@@ -27,11 +50,13 @@ export async function POST(request: Request) {
 
     const newVendor = await prisma.vendor.create({
       data: {
-        name,
+        orgId: org.id,
+        name: name.trim(),
         contactPerson: contactPerson || null,
         email: email || null,
         phone: phone || null,
         address: address || null,
+        status: 'ACTIVE'
       }
     });
 
