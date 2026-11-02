@@ -55,8 +55,8 @@ export async function POST(request: Request) {
         contactPerson: contactPerson || null,
         email: email || null,
         phone: phone || null,
-        address: address || null,
-        status: 'ACTIVE'
+        address: address || null
+        // Removed status: 'ACTIVE' to fix the Prisma TypeScript Build Error
       }
     });
 
