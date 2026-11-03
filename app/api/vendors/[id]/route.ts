@@ -4,18 +4,20 @@ import { requirePermission } from '@/lib/permissions';
 
 const prisma = new PrismaClient();
 
-// UPDATE a Vendor
+// UPDATE a Vendor - STRICTLY Admin/HR (SETTINGS:UPDATE)
 export async function PUT(
   request: Request,
-  { params }: { params: Promise<{ id: string }> } // Next.js 15+ awaitable params
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  // Only HR/Admin with Settings Update permission can edit vendors
   const auth = await requirePermission('SETTINGS', 'UPDATE');
-  if (!auth.authorized) return auth.response;
+  if (!auth.authorized) {
+    return NextResponse.json({ error: 'Forbidden. Only HR or Admin can edit vendors.' }, { status: 403 });
+  }
 
   try {
     const resolvedParams = await params;
     const id = resolvedParams.id;
-    // FIX: Removed 'status' from destructuring
     const { name, phone, email, address, contactPerson } = await request.json();
 
     if (!id || !name) {
@@ -30,7 +32,6 @@ export async function PUT(
         phone: phone || null,
         email: email || null,
         address: address || null,
-        // FIX: Removed 'status' field mapping here
       }
     });
 
@@ -41,13 +42,16 @@ export async function PUT(
   }
 }
 
-// DELETE a Vendor
+// DELETE a Vendor - STRICTLY Admin/HR (SETTINGS:DELETE)
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Only HR/Admin with Settings Delete permission can delete vendors
   const auth = await requirePermission('SETTINGS', 'DELETE');
-  if (!auth.authorized) return auth.response;
+  if (!auth.authorized) {
+    return NextResponse.json({ error: 'Forbidden. Only HR or Admin can delete vendors.' }, { status: 403 });
+  }
 
   try {
     const resolvedParams = await params;
@@ -61,11 +65,10 @@ export async function DELETE(
   } catch (error: any) {
     console.error("Error deleting vendor:", error);
     
-    // Check if the error is a Prisma Foreign Key Constraint failure (P2003)
-    // This happens because of the `onDelete: Restrict` in our schema.
+    // Catch Prisma Foreign Key Constraint failures gracefully
     if (error.code === 'P2003') {
       return NextResponse.json(
-        { error: 'Cannot delete this vendor because they are linked to existing bills. Try marking them as INACTIVE instead.' }, 
+        { error: 'Cannot delete this vendor because they are linked to existing bills. Please edit their details instead.' }, 
         { status: 409 }
       );
     }

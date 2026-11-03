@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { 
   FileSpreadsheet, Search, Loader2, Send, AlertCircle, 
   CheckCircle2, Clock, CheckSquare, Square, X, ArrowRight, ShieldAlert,
-  Building2, ChevronRight, UserCircle, Receipt
+  Building2, ChevronRight, UserCircle, Receipt, CircleDashed, Banknote
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -31,17 +31,20 @@ interface BillEntry {
 // --- PREMIUM STATUS BADGE ---
 const StatusBadge = ({ status }: { status: string }) => {
   const styles: Record<string, string> = {
-    SENT_TO_ACCOUNTS: 'bg-blue-50 text-blue-700 border-blue-200/60',
-    APPROVED_FOR_DISBURSEMENT: 'bg-teal-50 text-teal-700 border-teal-200/60',
+    SENT_TO_ACCOUNTS: 'bg-indigo-50 text-indigo-700 border-indigo-200/60',
+    APPROVED_FOR_DISBURSEMENT: 'bg-amber-50 text-amber-700 border-amber-200/60',
+    DISBURSED: 'bg-teal-50 text-teal-700 border-teal-200/60',
   };
 
   const labels: Record<string, string> = {
     SENT_TO_ACCOUNTS: 'Pending Review',
     APPROVED_FOR_DISBURSEMENT: 'Ready to Pay',
+    DISBURSED: 'Paid',
   };
 
   return (
     <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest border ${styles[status] || 'bg-neutral-100 text-neutral-600'}`}>
+      {status === 'DISBURSED' && <CheckCircle2 size={10} strokeWidth={3} />}
       {labels[status] || status}
     </span>
   );
@@ -63,12 +66,23 @@ const CompactTimeline = ({ bill }: { bill: BillEntry }) => {
       </div>
 
       <div className="relative">
-        <div className={`absolute -left-[17px] top-[5px] w-2 h-2 rounded-full ring-4 ring-white ${bill.accountsReceivedAt ? 'bg-blue-400' : 'bg-neutral-200'}`}></div>
+        <div className={`absolute -left-[17px] top-[5px] w-2 h-2 rounded-full ring-4 ring-white ${bill.accountsReceivedAt ? 'bg-indigo-400' : 'bg-neutral-200'}`}></div>
         <p className="text-[10px] text-neutral-500 leading-tight">
-          <span className={`font-bold ${bill.accountsReceivedAt ? 'text-blue-700' : 'text-neutral-400'}`}>Accounts Received:</span><br/>
+          <span className={`font-bold ${bill.accountsReceivedAt ? 'text-indigo-700' : 'text-neutral-400'}`}>Accounts Received:</span><br/>
           {bill.accountsReceivedAt ? formatTime(bill.accountsReceivedAt) : 'Awaiting sync'}
         </p>
       </div>
+
+      {/* NEW: Display disbursed timeline if applicable */}
+      {(bill.status === 'DISBURSED' || bill.disbursedAt) && (
+        <div className="relative">
+          <div className="absolute -left-[17px] top-[5px] w-2 h-2 rounded-full bg-teal-400 ring-4 ring-white"></div>
+          <p className="text-[10px] text-neutral-500 leading-tight">
+            <span className="font-bold text-teal-700">Disbursed:</span><br/>
+            {bill.disbursedAt ? formatTime(bill.disbursedAt) : 'Processing'}
+          </p>
+        </div>
+      )}
     </div>
   );
 };
@@ -77,7 +91,9 @@ export default function AccountsHub() {
   const [bills, setBills] = useState<BillEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED'>('PENDING');
+  
+  // NEW: 3 Tabs (Pending, Approved by Audit, Paid)
+  const [activeTab, setActiveTab] = useState<'PENDING' | 'APPROVED' | 'DISBURSED'>('PENDING');
   
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
@@ -117,6 +133,24 @@ export default function AccountsHub() {
     } catch (err) { alert("Failed to forward bills."); }
   };
 
+  // NEW: Bulk function to mark Audit-approved bills as Paid/Disbursed
+  const handleDisburseBills = async () => {
+    if (!confirm(`Mark ${selectedIds.length} approved bills as officially Paid/Disbursed?`)) return;
+    try {
+      for (const id of selectedIds) {
+        await fetch(`/api/reception/bills/${id}/status`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'DISBURSED' })
+        });
+      }
+      // Update UI state instantly to Disbursed
+      setBills(bills.map(b => selectedIds.includes(b.id) ? { ...b, status: 'DISBURSED', disbursedAt: new Date().toISOString() } : b));
+      setSelectedIds([]);
+      alert("Successfully marked as Disbursed.");
+    } catch (err) { alert("Failed to disburse bills."); }
+  };
+
   const handleReturnToFrontDesk = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedBillId || !discrepancyNote.trim()) return;
@@ -149,6 +183,7 @@ export default function AccountsHub() {
   const displayedBills = bills.filter(bill => {
     if (activeTab === 'PENDING' && bill.status !== 'SENT_TO_ACCOUNTS') return false;
     if (activeTab === 'APPROVED' && bill.status !== 'APPROVED_FOR_DISBURSEMENT') return false;
+    if (activeTab === 'DISBURSED' && bill.status !== 'DISBURSED') return false;
     
     const searchString = `${bill.vendor?.name} ${bill.systemSerialNo} ${bill.billNumber}`.toLowerCase();
     return searchString.includes(searchQuery.toLowerCase());
@@ -171,11 +206,11 @@ export default function AccountsHub() {
           <h1 className="text-3xl font-bold text-neutral-900 tracking-tight flex items-center gap-2">
             <FileSpreadsheet className="text-indigo-600" size={32} /> Accounts Hub
           </h1>
-          <p className="text-sm text-neutral-500 mt-1">Review physical bills, resolve discrepancies, and forward to Audit.</p>
+          <p className="text-sm text-neutral-500 mt-1">Review physical bills, resolve discrepancies, and process disbursements.</p>
         </div>
       </header>
 
-      {/* BULK ACTION BAR */}
+      {/* BULK ACTION BARS */}
       {selectedIds.length > 0 && activeTab === 'PENDING' && (
         <div className="bg-indigo-900 text-white px-6 py-3.5 rounded-2xl flex items-center justify-between shadow-xl animate-in slide-in-from-bottom-4 duration-200 border border-indigo-800">
           <div className="flex items-center gap-3 text-sm font-medium">
@@ -191,6 +226,21 @@ export default function AccountsHub() {
         </div>
       )}
 
+      {selectedIds.length > 0 && activeTab === 'APPROVED' && (
+        <div className="bg-amber-900 text-white px-6 py-3.5 rounded-2xl flex items-center justify-between shadow-xl animate-in slide-in-from-bottom-4 duration-200 border border-amber-800">
+          <div className="flex items-center gap-3 text-sm font-medium">
+            <span className="bg-white text-amber-900 font-bold px-2.5 py-0.5 rounded-full text-xs">{selectedIds.length}</span>
+            <span>bills approved by Audit and ready to pay</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={handleDisburseBills} className="flex items-center gap-1.5 px-5 py-2.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-bold rounded-xl transition-colors shadow-md border border-amber-500">
+              <Banknote size={14} /> Mark as Paid / Disbursed
+            </button>
+            <button onClick={() => setSelectedIds([])} className="text-xs text-amber-300 hover:text-white px-2 py-1 transition-colors">Deselect All</button>
+          </div>
+        </div>
+      )}
+
       {/* PREMIUM SaaS LIST VIEW */}
       <div className="bg-white border border-neutral-200 rounded-2xl shadow-sm overflow-hidden flex flex-col min-h-[600px]">
         
@@ -199,7 +249,7 @@ export default function AccountsHub() {
           
           <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 w-full xl:w-auto overflow-x-auto pb-2 xl:pb-0 custom-scrollbar">
             
-            {/* Tab Filters */}
+            {/* 3 Tabs Filter */}
             <div className="flex items-center bg-neutral-100/80 p-1 rounded-xl border border-neutral-200/60 shrink-0">
               <button 
                 onClick={() => { setActiveTab('PENDING'); setSelectedIds([]); }}
@@ -207,7 +257,7 @@ export default function AccountsHub() {
                   activeTab === 'PENDING' ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200/50' : 'text-neutral-500 hover:text-neutral-700'
                 }`}
               >
-                <Clock size={14} className={activeTab === 'PENDING' ? 'text-amber-500' : ''} /> Pending Initial Review
+                <Clock size={14} className={activeTab === 'PENDING' ? 'text-indigo-500' : ''} /> Pending Initial Review
               </button>
               <button 
                 onClick={() => { setActiveTab('APPROVED'); setSelectedIds([]); }}
@@ -215,7 +265,15 @@ export default function AccountsHub() {
                   activeTab === 'APPROVED' ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200/50' : 'text-neutral-500 hover:text-neutral-700'
                 }`}
               >
-                <CheckCircle2 size={14} className={activeTab === 'APPROVED' ? 'text-teal-600' : ''} /> Ready for Disbursement
+                <Banknote size={14} className={activeTab === 'APPROVED' ? 'text-amber-500' : ''} /> Ready for Disbursement
+              </button>
+              <button 
+                onClick={() => { setActiveTab('DISBURSED'); setSelectedIds([]); }}
+                className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
+                  activeTab === 'DISBURSED' ? 'bg-white text-neutral-900 shadow-sm border border-neutral-200/50' : 'text-neutral-500 hover:text-neutral-700'
+                }`}
+              >
+                <CheckCircle2 size={14} className={activeTab === 'DISBURSED' ? 'text-teal-600' : ''} /> Disbursed (Paid)
               </button>
             </div>
           </div>
@@ -260,7 +318,7 @@ export default function AccountsHub() {
                     
                     {/* 1. Select Box */}
                     <div className="col-span-1 hidden lg:flex justify-center items-center">
-                      {activeTab === 'PENDING' ? (
+                      {(activeTab === 'PENDING' || activeTab === 'APPROVED') ? (
                         <button onClick={() => toggleSelectOne(bill.id)} className={`transition-colors p-1 rounded ${isSelected ? 'text-indigo-600 bg-indigo-100/50' : 'text-neutral-300 hover:text-neutral-600 hover:bg-neutral-100'}`}>
                           {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
                         </button>
@@ -274,7 +332,7 @@ export default function AccountsHub() {
                       <div className="flex items-center gap-3">
                         {/* Mobile select checkbox */}
                         <div className="lg:hidden shrink-0">
-                           {activeTab === 'PENDING' && (
+                           {(activeTab === 'PENDING' || activeTab === 'APPROVED') && (
                              <button onClick={() => toggleSelectOne(bill.id)} className={isSelected ? 'text-indigo-600' : 'text-neutral-300'}><CheckSquare size={18} /></button>
                            )}
                         </div>

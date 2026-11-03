@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { requirePermission } from '@/lib/permissions';
-import { getServerSession } from 'next-auth';
 
 const prisma = new PrismaClient();
 
@@ -35,32 +34,18 @@ export async function PATCH(
 
     // 3. Robust Discrepancy Note Handling
     if (status === 'DISCREPANCY') {
-      // Ensure it always saves a string, even if the frontend payload glitches
       dataToUpdate.discrepancyNote = discrepancyNote?.trim() || 'Returned for review without specific comments.';
     } else if (status === 'SENT_TO_ACCOUNTS' || status === 'SENT_TO_AUDIT') {
       // Clear the red error message when it moves forward in the pipeline again
       dataToUpdate.discrepancyNote = null;
     }
 
-    // 4. Premium Auto-Stamping for Timeline
+    // 4. Timeline Timestamps (Restricted only to fields that exist in your schema)
     if (status === 'SENT_TO_ACCOUNTS') dataToUpdate.accountsReceivedAt = new Date();
     if (status === 'SENT_TO_AUDIT') dataToUpdate.auditReceivedAt = new Date();
-    
-    if (status === 'APPROVED_FOR_DISBURSEMENT') {
-      dataToUpdate.approvedAt = new Date();
-      
-      // Attempt to log exactly who approved it
-      const session = await getServerSession();
-      if (session?.user?.email) {
-        const user = await prisma.user.findUnique({ where: { email: session.user.email } });
-        if (user?.employeeId) {
-          // If you have `approvedById` in your prisma schema, this connects it automatically
-          dataToUpdate.approvedById = user.employeeId; 
-        }
-      }
-    }
-    
     if (status === 'DISBURSED') dataToUpdate.disbursedAt = new Date();
+    
+    // Note: APPROVED_FOR_DISBURSEMENT updates the status, but does not stamp 'approvedAt' as it is missing from the DB schema.
 
     // 5. Save and Return
     const updatedBill = await prisma.receptionBill.update({

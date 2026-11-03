@@ -1,29 +1,19 @@
 import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
-import { getServerSession } from 'next-auth';
-// Removed the broken authOptions import
+import { requirePermission } from '@/lib/permissions';
 
 const prisma = new PrismaClient();
 
-// Fetch all vendors for the dropdown (with multi-module RBAC)
+// GET: Read-only access for Reception (to select in bills) and Admin/HR
 export async function GET() {
   try {
-    // Call getServerSession without authOptions; NextAuth resolves it automatically
-    const session = await getServerSession();
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const authSettings = await requirePermission('SETTINGS', 'READ');
+    const authReception = await requirePermission('RECEPTION', 'CREATE'); // Needs to see vendors to make a bill
+    const authReceptionRead = await requirePermission('RECEPTION', 'READ'); 
 
-    const roleName = (session.user as any)?.roleName;
-    const permissions = (session.user as any)?.permissions || [];
-    const isAdmin = roleName === 'ADMIN' || roleName === 'Super Admin';
-
-    // Allow if Admin, OR has Settings Read, OR has Reception Read/Create
-    const canViewVendors = isAdmin || 
-                           permissions.includes('SETTINGS:READ') || 
-                           permissions.includes('RECEPTION:CREATE') ||
-                           permissions.includes('RECEPTION:READ');
-
-    if (!canViewVendors) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Allow if they have Settings Read OR Reception access
+    if (!authSettings.authorized && !authReception.authorized && !authReceptionRead.authorized) {
+      return NextResponse.json({ error: 'Forbidden. You do not have permission to view vendors.' }, { status: 403 });
     }
 
     const org = await prisma.organization.findFirst();
@@ -41,23 +31,14 @@ export async function GET() {
   }
 }
 
-// Quick-create a vendor from the Bill Entry modal (with multi-module RBAC)
+// POST: STRICTLY Admin/HR only (SETTINGS:CREATE)
 export async function POST(request: Request) {
   try {
-    const session = await getServerSession();
-    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // ONLY Settings permission can add vendors. Reception is NO LONGER allowed.
+    const authSettings = await requirePermission('SETTINGS', 'CREATE');
 
-    const roleName = (session.user as any)?.roleName;
-    const permissions = (session.user as any)?.permissions || [];
-    const isAdmin = roleName === 'ADMIN' || roleName === 'Super Admin';
-
-    // Allow if Admin, OR has Settings Create, OR has Reception Create
-    const canCreateVendors = isAdmin || 
-                             permissions.includes('SETTINGS:CREATE') || 
-                             permissions.includes('RECEPTION:CREATE');
-
-    if (!canCreateVendors) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!authSettings.authorized) {
+      return NextResponse.json({ error: 'Forbidden. Only HR or Admin can add new vendors.' }, { status: 403 });
     }
 
     const org = await prisma.organization.findFirst();
@@ -72,8 +53,7 @@ export async function POST(request: Request) {
         name: name.trim(),
         phone: phone || null,
         email: email || null,
-        address: address || null,
-        // Removed status: 'ACTIVE' to fix the Prisma TS Build Error
+        address: address || null
       }
     });
 
