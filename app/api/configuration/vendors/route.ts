@@ -9,7 +9,6 @@ const prisma = new PrismaClient();
 
 export async function GET() {
   try {
-    // Receptionists can read the list to attach to bills, Admins can read for settings
     const authSettings = await requirePermission('SETTINGS', 'READ');
     const authReception = await requirePermission('RECEPTION', 'CREATE');
     const authReceptionRead = await requirePermission('RECEPTION', 'READ');
@@ -35,7 +34,6 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    // STRICT: Only Admin or users with explicit SETTINGS:CREATE can add vendors
     const authSettings = await requirePermission('SETTINGS', 'CREATE');
     
     if (!authSettings.authorized) {
@@ -45,7 +43,8 @@ export async function POST(request: Request) {
     const org = await prisma.organization.findFirst();
     if (!org) return NextResponse.json({ error: "Organization not found" }, { status: 404 });
 
-    const { name, contactPerson, email, phone, address } = await request.json();
+    // Removed contactPerson to match the actual deployed database schema
+    const { name, email, phone, address } = await request.json();
 
     if (!name) {
       return NextResponse.json({ error: 'Vendor name is required' }, { status: 400 });
@@ -55,11 +54,9 @@ export async function POST(request: Request) {
       data: {
         orgId: org.id,
         name: name.trim(),
-        contactPerson: contactPerson || null,
         email: email || null,
         phone: phone || null,
         address: address || null
-        // Removed status: 'ACTIVE' to fix the Prisma TypeScript Build Error
       }
     });
 
