@@ -2,16 +2,18 @@ import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { requirePermission } from '@/lib/permissions';
 
+// Force Vercel to fetch fresh data every time, disabling static build cache
+export const dynamic = 'force-dynamic'; 
+
 const prisma = new PrismaClient();
 
-// GET: Read-only access for Reception (to select in bills) and Admin/HR
+// GET: Read-only access for Reception and Admin/HR
 export async function GET() {
   try {
     const authSettings = await requirePermission('SETTINGS', 'READ');
-    const authReception = await requirePermission('RECEPTION', 'CREATE'); // Needs to see vendors to make a bill
+    const authReception = await requirePermission('RECEPTION', 'CREATE'); 
     const authReceptionRead = await requirePermission('RECEPTION', 'READ'); 
 
-    // Allow if they have Settings Read OR Reception access
     if (!authSettings.authorized && !authReception.authorized && !authReceptionRead.authorized) {
       return NextResponse.json({ error: 'Forbidden. You do not have permission to view vendors.' }, { status: 403 });
     }
@@ -26,7 +28,6 @@ export async function GET() {
     
     return NextResponse.json(vendors);
   } catch (error) {
-    console.error("Error fetching vendors:", error);
     return NextResponse.json({ error: 'Failed to fetch vendors' }, { status: 500 });
   }
 }
@@ -34,7 +35,6 @@ export async function GET() {
 // POST: STRICTLY Admin/HR only (SETTINGS:CREATE)
 export async function POST(request: Request) {
   try {
-    // ONLY Settings permission can add vendors. Reception is NO LONGER allowed.
     const authSettings = await requirePermission('SETTINGS', 'CREATE');
 
     if (!authSettings.authorized) {
@@ -59,7 +59,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json(newVendor, { status: 201 });
   } catch (error) {
-    console.error("Error creating vendor:", error);
     return NextResponse.json({ error: 'Failed to create vendor' }, { status: 500 });
   }
 }

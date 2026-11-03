@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { requirePermission } from '@/lib/permissions';
 
+// Force Vercel to dynamically render this route on every request
+export const dynamic = 'force-dynamic';
+
 const prisma = new PrismaClient();
 
 export async function GET() {
